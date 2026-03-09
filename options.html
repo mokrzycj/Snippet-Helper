@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Text Expander - Dashboard</title>
+  <style>
+    /* THEME VARIABLE DEFINITIONS */
+    :root {
+      --bg-color: #f4f6f8;
+      --sidebar-bg: white;
+      --main-bg: #fafafa;
+      --text-main: #333;
+      --text-heading: #2c3e50;
+      --text-muted: #7f8c8d;
+      --border-light: #eee;
+      --border-main: #e0e0e0;
+      --input-border: #ebedef;
+      --input-bg: white;
+      --card-bg: white;
+      --card-hover-shadow: rgba(0,0,0,0.05);
+      --card-text: #555;
+      --code-bg: #f9f9f9;
+      --code-border: #ccc;
+      --key-bg: #fff3e0;
+      --key-text: #e67e22;
+      --tag-bg: #e1f5fe;
+      --tag-text: #0288d1;
+      --btn-primary: #27ae60;
+      --btn-primary-hover: #2ecc71;
+      --btn-sec-bg: #ecf0f1;
+      --btn-sec-text: #7f8c8d;
+      --btn-sec-hover: #bdc3c7;
+      --action-edit-bg: #f0f2f5;
+      --action-edit-text: #2c3e50;
+      --action-edit-hover: #e2e6ea;
+      --action-del-bg: #fadbd8;
+      --action-del-text: #c0392b;
+      --action-del-hover: #f5b7b1;
+      --stat-bg: #f0f7ff;
+      --stat-border: #cce3ff;
+      --stat-value: #0056b3;
+      --link-color: #3498db;
+    }
+
+    /* DARK THEME */
+    [data-theme="dark"] {
+      --bg-color: #121212;
+      --sidebar-bg: #1e1e1e;
+      --main-bg: #121212;
+      --text-main: #e0e0e0;
+      --text-heading: #ffffff;
+      --text-muted: #aaaaaa;
+      --border-light: #333;
+      --border-main: #444;
+      --input-border: #555;
+      --input-bg: #2c2c2c;
+      --card-bg: #1e1e1e;
+      --card-hover-shadow: rgba(0,0,0,0.5);
+      --card-text: #cccccc;
+      --code-bg: #2a2a2a;
+      --code-border: #444;
+      --key-bg: #e65100;
+      --key-text: #ffb74d;
+      --tag-bg: #0d47a1;
+      --tag-text: #90caf9;
+      --btn-primary: #1e8449;
+      --btn-primary-hover: #27ae60;
+      --btn-sec-bg: #333;
+      --btn-sec-text: #aaa;
+      --btn-sec-hover: #555;
+      --action-edit-bg: #333;
+      --action-edit-text: #e0e0e0;
+      --action-edit-hover: #444;
+      --action-del-bg: #7b241c;
+      --action-del-text: #e6b0aa;
+      --action-del-hover: #922b21;
+      --stat-bg: #1a252f;
+      --stat-border: #2c3e50;
+      --stat-value: #5dade2;
+      --link-color: #5dade2;
+    }
+
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; display: flex; height: 100vh; color: var(--text-main); transition: background-color 0.3s, color 0.3s; }
+    .sidebar { width: 400px; background: var(--sidebar-bg); padding: 30px; border-right: 1px solid var(--border-main); display: flex; flex-direction: column; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.02); }
+    .main-content { flex: 1; padding: 40px; overflow-y: auto; background: var(--main-bg); }
+    h1 { margin-top: 0; font-size: 24px; color: var(--text-heading); display: flex; justify-content: space-between; align-items: center; }
+    h2 { font-size: 18px; color: var(--text-muted); margin-top: 0; }
+    
+    /* Form */
+    .input-group { margin-bottom: 20px; }
+    label { display: block; font-weight: bold; font-size: 12px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+    input[type="text"], textarea { width: 100%; padding: 12px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 15px; box-sizing: border-box; transition: border 0.2s; font-family: inherit; background: var(--input-bg); color: var(--text-main); }
+    input[type="text"]:focus, textarea:focus { border-color: var(--link-color); outline: none; }
+    textarea { height: 200px; resize: vertical; line-height: 1.5; }
+    
+    /* Tag Input in Form */
+    .tag-input-container { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; border: 2px solid var(--input-border); border-radius: 8px; min-height: 48px; box-sizing: border-box; background: var(--input-bg); cursor: text; transition: border 0.2s; }
+    .tag-input-container.focus { border-color: var(--link-color); }
+    .tag-pill { background: var(--link-color); color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+    .tag-pill span { cursor: pointer; font-weight: bold; }
+    .tag-input-container input { border: none; outline: none; flex: 1; min-width: 100px; font-size: 15px; padding: 0; margin: 0; background: transparent; color: var(--text-main); }
+    
+    .btn { padding: 14px 20px; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; transition: 0.2s; }
+    .btn-primary { background: var(--btn-primary); color: white; width: 100%; margin-bottom: 10px; }
+    .btn-primary:hover { background: var(--btn-primary-hover); }
+    .btn-secondary { background: var(--btn-sec-bg); color: var(--btn-sec-text); width: 100%; }
+    .btn-secondary:hover { background: var(--btn-sec-hover); color: white; }
+
+    /* --- Stats --- */
+    .stats-container { display: flex; gap: 10px; margin-top: 20px; margin-bottom: 10px; }
+    .stat-box { flex: 1; background: var(--stat-bg); padding: 15px 10px; border-radius: 8px; text-align: center; border: 1px solid var(--stat-border); }
+    .stat-value { font-size: 22px; font-weight: bold; color: var(--stat-value); display: block; margin-bottom: 4px; }
+    .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; }
+
+    /* --- Tag Filters --- */
+    .filter-section { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+    .filter-tags-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .filter-tag { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; background: var(--input-bg); border: 2px solid var(--input-border); color: var(--text-muted); transition: all 0.2s; user-select: none; }
+    .filter-tag:hover { border-color: var(--link-color); color: var(--link-color); }
+    .filter-tag.active { background: var(--link-color); border-color: var(--link-color); color: white; }
+    .clear-filters-btn { background: none; border: none; color: var(--action-del-text); font-weight: bold; cursor: pointer; font-size: 13px; padding: 6px 10px; border-radius: 6px; }
+    .clear-filters-btn:hover { background: var(--action-del-bg); }
+
+    /* --- Bulk Actions --- */
+    .bulk-container { background: var(--tag-bg); padding: 15px; border-radius: 8px; margin-bottom: 20px; display: none; align-items: center; gap: 15px; border: 1px solid var(--tag-text); box-shadow: 0 2px 5px var(--card-hover-shadow); }
+    .bulk-label { font-weight: bold; color: var(--tag-text); white-space: nowrap; }
+    .bulk-container input { padding: 10px; border: 2px solid var(--border-main); border-radius: 6px; flex: 1; outline: none; font-size: 14px; background: var(--input-bg); color: var(--text-main); }
+    .bulk-btn { margin: 0; width: auto; padding: 10px 20px; border-radius: 6px; }
+
+    /* --- List on Right --- */
+    .search-bar { width: 100%; padding: 15px; font-size: 16px; border: 2px solid var(--border-main); border-radius: 8px; margin-bottom: 20px; box-sizing: border-box; background: var(--input-bg); color: var(--text-main); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+    .card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border-light); box-shadow: 0 4px 6px var(--card-hover-shadow); display: flex; flex-direction: column; transition: transform 0.2s; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 6px 12px var(--card-hover-shadow); }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
+    .card-key { font-size: 18px; font-weight: bold; color: var(--key-text); background: var(--key-bg); padding: 4px 8px; border-radius: 6px; }
+    .card-text { font-size: 14px; color: var(--card-text); white-space: pre-wrap; flex-grow: 1; margin-bottom: 15px; background: var(--code-bg); padding: 10px; border-radius: 6px; border: 1px dashed var(--code-border); }
+    .card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
+    .card-tag { background: var(--tag-bg); color: var(--tag-text); padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+    .card-actions { display: flex; gap: 10px; border-top: 1px solid var(--border-light); padding-top: 15px; }
+    .action-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; }
+    .action-btn.edit { background: var(--action-edit-bg); color: var(--action-edit-text); }
+    .action-btn.edit:hover { background: var(--action-edit-hover); }
+    .action-btn.delete { background: var(--action-del-bg); color: var(--action-del-text); }
+    .action-btn.delete:hover { background: var(--action-del-hover); }
+    
+    .var-btn {
+      background: var(--btn-sec-bg);
+      color: var(--btn-sec-text);
+      border: 1px solid var(--border-main);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .var-btn:hover {
+      background: var(--link-color);
+      color: white;
+      border-color: var(--link-color);
+    }
+
+    .empty-state { text-align: center; grid-column: 1 / -1; padding: 50px; color: var(--text-muted); font-size: 18px; }
+
+    .theme-toggle { background: none; border: none; font-size: 14px; cursor: pointer; color: var(--text-muted); transition: color 0.2s; }
+    .theme-toggle:hover { color: var(--text-main); }
+    .text-link { background: none; border: none; color: var(--link-color); cursor: pointer; text-decoration: underline; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <!-- LEFT PANEL - FORM -->
+  <div class="sidebar">
+    <h1>
+      <span id="form-title">New Template</span>
+      <button id="theme-toggle" class="theme-toggle">🌙 Dark Theme</button>
+    </h1>
+    
+    <div class="input-group">
+      <label>Shortcut (Trigger)</label>
+      <input type="text" id="shortcut" placeholder="e.g. hw//">
+    </div>
+
+    <div class="input-group">
+      <label>Text (use | to set cursor)</label>
+      <div id="variable-helpers" style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 5px;">
+        <button class="var-btn" data-var="{{date}}" title="Current Date">+ Date</button>
+        <button class="var-btn" data-var="{{time}}" title="Current Time">+ Time</button>
+        <button class="var-btn" data-var="{{clipboard}}" title="Paste Clipboard">+ Clip</button>
+        <button class="var-btn" data-var="{{identity_select}}" title="Choose between available names">+ Select Name</button>
+        <button class="var-btn" data-var="{{caller_name}}" title="ServiceNow Caller (First Name)">+ Caller</button>
+        <button class="var-btn" data-var="{{requested_for}}" title="ServiceNow Requested For (First Name)">+ Req For</button>
+        <button class="var-btn" data-var="{{opened_by}}" title="ServiceNow Opened By (First Name)">+ Opened By</button>
+        <button class="var-btn" data-var="{{ticket_number}}" title="ServiceNow Ticket Number">+ Ticket</button>
+        <button class="var-btn" data-var="{{prompt:Label}}" title="Ask for user input">+ Prompt</button>
+      </div>
+      <textarea id="replacement" placeholder="Dear Customer,\n\nThank you for your message..."></textarea>
+      
+      <details style="margin-top: 10px; font-size: 12px; color: var(--text-muted);">
+        <summary style="cursor: pointer; font-weight: bold;">Variable Cheat Sheet</summary>
+        <div style="padding: 10px; background: var(--code-bg); border-radius: 6px; margin-top: 5px; border: 1px solid var(--border-light);">
+          <ul style="padding-left: 15px; margin: 0; line-height: 1.6;">
+            <li><code>{{date}}</code>, <code>{{time}}</code> - System Date/Time</li>
+            <li><code>{{clipboard}}</code> - Paste current clipboard content</li>
+            <li><code>{{prompt:Label}}</code> - Show input box with 'Label'</li>
+            <li><code>{{identity_select}}</code> - Prompt to choose from available SN names</li>
+            <li><code>{{caller_name}}</code>, <code>{{requested_for}}</code>, <code>{{opened_by}}</code> - SN First Names</li>
+            <li><code>{{ticket_number}}</code> - SN Field (number/id)</li>
+            <li><code>{{sn:field_name}}</code> - Custom ServiceNow Field</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+
+    <div class="input-group">
+      <label>Tags (Press Enter after each)</label>
+      <div class="tag-input-container" id="tag-container">
+        <input type="text" id="tag-input" placeholder="add tag...">
+      </div>
+    </div>
+
+    <button id="save-btn" class="btn btn-primary">Save Shortcut</button>
+    <button id="cancel-btn" class="btn btn-secondary" style="display: none;">Cancel Edit</button>
+    
+    <!-- Settings Section -->
+    <div class="input-group" style="margin-top: 20px; border-top: 1px solid var(--border-light); padding-top: 20px;">
+      <label>ServiceNow Image Paste</label>
+      <select id="paste-behavior" style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-family: inherit;">
+        <option value="modal">Show Preview Modal</option>
+        <option value="auto">Auto-Upload (No Confirmation)</option>
+      </select>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="stats-container">
+      <div class="stat-box" title="Number of shortcuts used">
+        <span class="stat-value" id="usage-count">0</span>
+        <span class="stat-label">Shortcut Uses</span>
+      </div>
+      <div class="stat-box" title="Estimated time saved (approx. 300 chars/min)">
+        <span class="stat-value" id="time-saved">0m</span>
+        <span class="stat-label">Time Saved</span>
+      </div>
+    </div>
+
+    <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 10px; align-items: center;">
+      <button id="export-btn" class="text-link">Export Backup</button>
+      <button id="import-btn" class="text-link">Import Backup</button>
+      <input type="file" id="import-file" accept=".json" style="display: none;">
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL - LIST -->
+  <div class="main-content">
+    <h2>Your Shortcut Database</h2>
+    
+    <!-- Tag Filters -->
+    <div id="filter-section" class="filter-section" style="display: none;">
+      <div id="filter-tags-list" class="filter-tags-list"></div>
+      <button id="clear-filters-btn" class="clear-filters-btn" style="display: none;">✖ Clear filters</button>
+    </div>
+
+    <input type="text" id="search" class="search-bar" placeholder="🔍 Search shortcuts, content, and tags...">
+    
+    <div id="grid" class="grid"></div>
+    <div id="empty-state" class="empty-state" style="display: none;">
+      No shortcuts found. Change your search criteria or add a new one!
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

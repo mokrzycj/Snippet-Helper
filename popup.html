@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Quick Search</title>
+  <style>
+    /* THEME VARIABLE DEFINITIONS */
+    :root {
+      --bg-color: #f8f9fa;
+      --text-main: #333;
+      --text-muted: #7f8c8d;
+      --input-bg: white;
+      --input-border: #3498db;
+      --item-bg: white;
+      --item-shadow: rgba(0,0,0,0.1);
+      --key-text: #e67e22;
+      --tag-bg: #e1f5fe;
+      --tag-text: #0288d1;
+      --btn-bg: #2c3e50;
+      --btn-hover: #34495e;
+      --scrollbar-thumb: #bdc3c7;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #121212;
+      --text-main: #e0e0e0;
+      --text-muted: #aaaaaa;
+      --input-bg: #2c2c2c;
+      --input-border: #2980b9;
+      --item-bg: #1e1e1e;
+      --item-shadow: rgba(0,0,0,0.5);
+      --key-text: #ffb74d;
+      --tag-bg: #0d47a1;
+      --tag-text: #90caf9;
+      --btn-bg: #1e1e1e;
+      --btn-hover: #333;
+      --scrollbar-thumb: #555;
+    }
+
+    body { width: 350px; margin: 0; padding: 15px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-main); transition: background-color 0.3s, color 0.3s; }
+    
+    .header { display: flex; gap: 10px; margin-bottom: 15px; }
+    .search-box { flex: 1; padding: 12px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 14px; box-sizing: border-box; outline: none; background: var(--input-bg); color: var(--text-main); }
+    .theme-toggle { background: var(--item-bg); border: 1px solid var(--input-border); border-radius: 8px; cursor: pointer; padding: 0 10px; font-size: 16px; transition: 0.2s; box-shadow: 0 1px 3px var(--item-shadow); }
+    
+    .shortcut-list { list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto; }
+    .shortcut-item { background: var(--item-bg); border-radius: 6px; padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 3px var(--item-shadow); cursor: pointer; position: relative; transition: transform 0.1s, box-shadow 0.1s; border: 1px solid transparent; }
+    .shortcut-item:hover { transform: translateY(-1px); box-shadow: 0 3px 6px var(--item-shadow); border-color: var(--input-border); }
+    .shortcut-item:active { transform: translateY(0); box-shadow: 0 1px 2px var(--item-shadow); }
+
+    .copy-badge { position: absolute; top: 10px; right: 10px; background: var(--btn-bg); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .copy-badge.visible { opacity: 1; }
+    .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .item-key { font-weight: bold; color: var(--key-text); font-size: 13px; }
+    .item-preview { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .tag-container { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .tag { background: var(--tag-bg); color: var(--tag-text); padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: lowercase; }
+    .empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px 0; }
+    .manage-btn { display: block; width: 100%; padding: 12px; background: var(--btn-bg); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; transition: background 0.2s; border: 1px solid var(--input-border); }
+    .manage-btn:hover { background: var(--btn-hover); }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 10px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <input type="text" id="search" class="search-box" placeholder="🔍 Search shortcut or #tag..." autofocus>
+    <button id="theme-toggle" class="theme-toggle" title="Change theme">🌙</button>
+  </div>
+  
+  <ul id="list" class="shortcut-list"></ul>
+  <div id="empty-state" class="empty" style="display: none;">Nothing found.</div>
+
+  <button id="manage-btn" class="manage-btn">⚙️ Manage Shortcuts</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
