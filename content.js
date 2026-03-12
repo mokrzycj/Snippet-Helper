@@ -319,35 +319,51 @@ async function resolveVariable(varName) {
 
     // ServiceNow Variables
     if (table) {
-        const findField = (fieldName, isDisplay = true) => {
-            const patterns = isDisplay ? [
-                `sys_display.${table}.${fieldName}`,
-                `sys_display.IO:${fieldName}`,
-                `${table}.${fieldName}`,
-                `IO:${fieldName}`
-            ] : [
-                `sys_readonly.${table}.${fieldName}`,
-                `${table}.${fieldName}`,
-                fieldName
-            ];
-
-            for (const id of patterns) {
-                const el = document.getElementById(id);
-                if (el) return el.value || el.innerText || "";
-            }
+        const findField = (fieldNames, isDisplay = true) => {
+            const names = Array.isArray(fieldNames) ? fieldNames : [fieldNames];
             
-            const suffix = `.${fieldName}`;
-            const elSuffix = document.querySelector(`[id$="${suffix}"]`);
-            if (elSuffix) return elSuffix.value || elSuffix.innerText || "";
+            for (const fieldName of names) {
+                const patterns = isDisplay ? [
+                    `sys_display.${table}.${fieldName}`,
+                    `sys_display.IO:${fieldName}`,
+                    `${table}.${fieldName}`,
+                    `IO:${fieldName}`
+                ] : [
+                    `sys_readonly.${table}.${fieldName}`,
+                    `${table}.${fieldName}`,
+                    fieldName
+                ];
+
+                for (const id of patterns) {
+                    const el = document.getElementById(id);
+                    // Check if element exists and has a non-empty value/text
+                    if (el) {
+                        const val = el.value || el.innerText;
+                        if (val && val.trim().length > 0) return val.trim();
+                    }
+                }
+                
+                const suffix = `.${fieldName}`;
+                const elSuffix = document.querySelector(`[id$="${suffix}"]`);
+                if (elSuffix) {
+                    const val = elSuffix.value || elSuffix.innerText;
+                    if (val && val.trim().length > 0) return val.trim();
+                }
+            }
             
             return null;
         };
 
+        const callerCandidates = ['caller_id', 'u_caller', 'u_caller_id', 'opened_by'];
+        const reqForCandidates = ['requested_for', 'requested_for_label', 'u_requested_for', 'u_requested_for_label', 'requested_for_display'];
+        const openedByCandidates = ['opened_by', 'u_opened_by', 'opened_by_label'];
+        const assignedToCandidates = ['assigned_to', 'u_assigned_to', 'assigned_to_label'];
+
         if (varName === 'identity_select') {
             const options = [
-                { label: 'Caller', value: findField('caller_id') || findField('u_caller') },
-                { label: 'Requested For', value: findField('requested_for_label') },
-                { label: 'Opened By', value: findField('opened_by') }
+                { label: 'Requested For', value: findField(reqForCandidates) },
+                { label: 'Opened By', value: findField(openedByCandidates) },
+                { label: 'Caller', value: findField(callerCandidates) }
             ].filter(opt => opt.value && opt.value.trim().length > 0);
 
             if (options.length === 0) return "User";
@@ -358,19 +374,19 @@ async function resolveVariable(varName) {
         }
 
         if (varName === 'caller_name') {
-            return getFirstName(findField('caller_id') || findField('u_caller') || "User");
+            return getFirstName(findField(callerCandidates) || "User");
         }
         if (varName === 'requested_for') {
-            return getFirstName(findField('requested_for_label') || "User");
+            return getFirstName(findField(reqForCandidates) || "User");
         }
         if (varName === 'opened_by') {
-            return getFirstName(findField('opened_by') || "User");
+            return getFirstName(findField(openedByCandidates) || "User");
         }
         if (varName === 'assigned_to') {
-            return getFirstName(findField('assigned_to') || "Agent");
+            return getFirstName(findField(assignedToCandidates) || "Agent");
         }
         if (varName === 'ticket_number') {
-            return findField('number', false) || findField('id', false) || "Ticket";
+            return findField(['number', 'id', 'u_number'], false) || "Ticket";
         }
         
         if (varName.startsWith('sn:')) {
@@ -381,9 +397,9 @@ async function resolveVariable(varName) {
 
     // Fallbacks
     const fallbacks = {
-        'caller_name': 'User',
         'requested_for': 'User',
         'opened_by': 'User',
+        'caller_name': 'User',
         'assigned_to': 'Agent',
         'ticket_number': 'Ticket',
         'identity_select': 'User'
@@ -482,16 +498,14 @@ function showShortcutPopup(activeEl, trigger) {
                     <div style="font-size: 11px; color: ${isDark ? '#aaa' : '#666'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${preview}</div>
                 `;
 
-                // Use mousedown to trigger before the popup "click outside" logic can potentially interfere
                 itemDiv.onmousedown = (e) => {
-                    e.preventDefault(); // Keep focus on search input or activeEl
+                    e.preventDefault();
                     e.stopPropagation();
                     selectItem(key);
                 };
 
                 itemDiv.onmouseenter = () => {
                     selectedIndex = idx;
-                    // Visual update only to avoid full re-render loop
                     popup.querySelectorAll('.sn-popup-item').forEach((el, i) => {
                         const sel = i === selectedIndex;
                         el.style.background = sel ? (isDark ? '#333' : '#eef6ff') : 'transparent';
@@ -541,7 +555,6 @@ function showShortcutPopup(activeEl, trigger) {
             }
         };
 
-        // Click outside to cancel
         const clickHandler = (e) => {
             if (!popup.contains(e.target)) {
                 document.removeEventListener('mousedown', clickHandler);
@@ -562,89 +575,108 @@ function showSelection(options) {
         const rect = activeEl.getBoundingClientRect();
         const promptDiv = document.createElement('div');
         promptDiv.className = 'sn-variable-prompt';
-        promptDiv.style.cssText = `
-            position: fixed;
-            top: ${Math.max(10, rect.top - 120)}px;
-            left: ${rect.left}px;
-            background: #fff;
-            border: 2px solid #278efc;
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            z-index: 2147483647;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            min-width: 240px;
-            font-family: sans-serif;
-        `;
-
-        let selectedIndex = 0;
-
-        const renderOptions = () => {
-            let html = `<div style="font-size: 11px; font-weight: bold; color: #278efc; text-transform: uppercase; margin-bottom: 5px;">Select Identity</div>`;
-            options.forEach((opt, idx) => {
-                const isSelected = idx === selectedIndex;
-                const bg = isSelected ? "#eef6ff" : "#f9f9f9";
-                const border = isSelected ? "1px solid #278efc" : "1px solid #eee";
-                html += `<button class="sn-select-opt" data-idx="${idx}" style="text-align: left; padding: 8px; border: ${border}; border-radius: 4px; background: ${bg}; cursor: pointer; font-size: 13px; transition: 0.1s;">
-                    <b style="color: #555;">${opt.label}:</b> ${opt.value}
-                </button>`;
-            });
-            promptDiv.innerHTML = html;
-            
-            // Re-attach click listeners after re-render
-            promptDiv.querySelectorAll('.sn-select-opt').forEach(btn => {
-                btn.onclick = () => {
-                    resolve(options[btn.getAttribute('data-idx')].value);
-                    cleanup();
-                };
-                btn.onmouseenter = () => {
-                    selectedIndex = parseInt(btn.getAttribute('data-idx'));
-                    renderOptions();
-                };
-            });
-        };
-
-        const cleanup = () => {
-            document.removeEventListener('keydown', keyHandler);
-            document.removeEventListener('mousedown', clickHandler);
-            promptDiv.remove();
-            activeEl.focus();
-        };
-
-        const keyHandler = (e) => {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                selectedIndex = (selectedIndex + 1) % options.length;
-                renderOptions();
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                selectedIndex = (selectedIndex - 1 + options.length) % options.length;
-                renderOptions();
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                resolve(options[selectedIndex].value);
-                cleanup();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                cleanup();
-                resolve("");
-            }
-        };
-
-        const clickHandler = (e) => {
-            if (!promptDiv.contains(e.target)) {
-                cleanup();
-                resolve("");
-            }
-        };
-
-        renderOptions();
-        document.body.appendChild(promptDiv);
         
-        document.addEventListener('keydown', keyHandler);
-        setTimeout(() => document.addEventListener('mousedown', clickHandler), 10);
+        chrome.storage.local.get(['theme'], (res) => {
+            const isDark = res.theme === 'dark';
+            promptDiv.style.cssText = `
+                position: fixed;
+                top: ${Math.max(10, rect.top - 120)}px;
+                left: ${rect.left}px;
+                background: ${isDark ? '#1e1e1e' : '#fff'};
+                color: ${isDark ? '#e0e0e0' : '#333'};
+                border: 2px solid #278efc;
+                padding: 10px;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                z-index: 2147483647;
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+                min-width: 260px;
+                font-family: sans-serif;
+            `;
+
+            let selectedIndex = 0;
+
+            const renderOptions = () => {
+                let html = `<div style="font-size: 11px; font-weight: bold; color: #278efc; text-transform: uppercase; margin-bottom: 5px; padding: 0 5px;">Select Identity</div>`;
+                promptDiv.innerHTML = html;
+
+                options.forEach((opt, idx) => {
+                    const isSelected = idx === selectedIndex;
+                    const btn = document.createElement('div');
+                    btn.className = 'sn-select-opt';
+                    btn.style.cssText = `
+                        text-align: left;
+                        padding: 10px;
+                        border: 1px solid ${isSelected ? '#278efc' : (isDark ? '#333' : '#eee')};
+                        border-radius: 4px;
+                        background: ${isSelected ? (isDark ? '#333' : '#eef6ff') : 'transparent'};
+                        cursor: pointer;
+                        font-size: 13px;
+                        transition: 0.1s;
+                    `;
+                    btn.innerHTML = `<b style="color: ${isDark ? '#ffb74d' : '#e67e22'};">${opt.label}:</b> ${opt.value}`;
+                    
+                    btn.onmousedown = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        resolve(opt.value);
+                        cleanup();
+                    };
+
+                    btn.onmouseenter = () => {
+                        selectedIndex = idx;
+                        promptDiv.querySelectorAll('.sn-select-opt').forEach((el, i) => {
+                            const sel = i === selectedIndex;
+                            el.style.background = sel ? (isDark ? '#333' : '#eef6ff') : 'transparent';
+                            el.style.borderColor = sel ? '#278efc' : (isDark ? '#333' : '#eee');
+                        });
+                    };
+                    promptDiv.appendChild(btn);
+                });
+            };
+
+            const cleanup = () => {
+                document.removeEventListener('keydown', keyHandler);
+                document.removeEventListener('mousedown', clickHandler);
+                promptDiv.remove();
+                activeEl.focus();
+            };
+
+            const keyHandler = (e) => {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = (selectedIndex + 1) % options.length;
+                    renderOptions();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = (selectedIndex - 1 + options.length) % options.length;
+                    renderOptions();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    resolve(options[selectedIndex].value);
+                    cleanup();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cleanup();
+                    resolve("");
+                }
+            };
+
+            const clickHandler = (e) => {
+                if (!promptDiv.contains(e.target)) {
+                    cleanup();
+                    resolve("");
+                }
+            };
+
+            renderOptions();
+            document.body.appendChild(promptDiv);
+            
+            document.addEventListener('keydown', keyHandler);
+            setTimeout(() => document.addEventListener('mousedown', clickHandler), 10);
+        });
     });
 }
 
@@ -656,58 +688,62 @@ function showPrompt(label) {
         const rect = activeEl.getBoundingClientRect();
         const promptDiv = document.createElement('div');
         promptDiv.className = 'sn-variable-prompt';
-        promptDiv.style.cssText = `
-            position: fixed;
-            top: ${Math.max(10, rect.top - 60)}px;
-            left: ${rect.left}px;
-            background: #fff;
-            border: 2px solid #278efc;
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            z-index: 2147483647;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            min-width: 220px;
-            font-family: sans-serif;
-        `;
+        
+        chrome.storage.local.get(['theme'], (res) => {
+            const isDark = res.theme === 'dark';
+            promptDiv.style.cssText = `
+                position: fixed;
+                top: ${Math.max(10, rect.top - 100)}px;
+                left: ${rect.left}px;
+                background: ${isDark ? '#1e1e1e' : '#fff'};
+                color: ${isDark ? '#e0e0e0' : '#333'};
+                border: 2px solid #278efc;
+                padding: 15px;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                z-index: 2147483647;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                min-width: 240px;
+                font-family: sans-serif;
+            `;
 
-        promptDiv.innerHTML = `
-            <div style="font-size: 12px; font-weight: bold; color: #278efc; text-transform: uppercase;">${label}</div>
-            <input type="text" id="sn-prompt-input" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; outline: none; box-sizing: border-box;">
-            <div style="font-size: 10px; color: #999;">Press Enter to insert, Esc to cancel</div>
-        `;
+            promptDiv.innerHTML = `
+                <div style="font-size: 11px; font-weight: bold; color: #278efc; text-transform: uppercase;">${label}</div>
+                <input type="text" id="sn-prompt-input" style="width: 100%; padding: 10px; border: 1px solid ${isDark ? '#444' : '#ccc'}; border-radius: 4px; outline: none; box-sizing: border-box; background: ${isDark ? '#2c2c2c' : '#fff'}; color: ${isDark ? '#fff' : '#000'};">
+                <div style="font-size: 10px; color: ${isDark ? '#aaa' : '#999'};">Press Enter to insert, Esc to cancel</div>
+            `;
 
-        document.body.appendChild(promptDiv);
-        const input = promptDiv.querySelector('#sn-prompt-input');
-        input.focus();
+            document.body.appendChild(promptDiv);
+            const input = promptDiv.querySelector('#sn-prompt-input');
+            input.focus();
 
-        const cleanup = () => {
-            promptDiv.remove();
-            activeEl.focus();
-        };
+            const cleanup = () => {
+                promptDiv.remove();
+                activeEl.focus();
+            };
 
-        input.onkeydown = (e) => {
-            if (e.key === 'Enter') {
-                const val = input.value;
-                cleanup();
-                resolve(val);
-            } else if (e.key === 'Escape') {
-                cleanup();
-                resolve("");
-            }
-        };
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    const val = input.value;
+                    cleanup();
+                    resolve(val);
+                } else if (e.key === 'Escape') {
+                    cleanup();
+                    resolve("");
+                }
+            };
 
-        // Click outside to cancel
-        const clickHandler = (e) => {
-            if (!promptDiv.contains(e.target)) {
-                document.removeEventListener('mousedown', clickHandler);
-                cleanup();
-                resolve("");
-            }
-        };
-        setTimeout(() => document.addEventListener('mousedown', clickHandler), 10);
+            const clickHandler = (e) => {
+                if (!promptDiv.contains(e.target)) {
+                    document.removeEventListener('mousedown', clickHandler);
+                    cleanup();
+                    resolve("");
+                }
+            };
+            setTimeout(() => document.addEventListener('mousedown', clickHandler), 10);
+        });
     });
 }
 
