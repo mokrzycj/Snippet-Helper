@@ -1,6 +1,16 @@
-document.addEventListener('DOMContentLoaded', () => {
-    loadTheme();
-    loadShortcuts();
+// src/popup/main.js
+import { getShortcuts, getSettings, saveSetting, onStorageChange } from '../shared/storage.js';
+
+let allData = {};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const settings = await getSettings();
+    applyTheme(settings.theme === 'dark');
+    
+    const shortcuts = await getShortcuts();
+    allData = shortcuts;
+    renderList(allData);
+    renderTagCloud();
     
     document.getElementById('manage-btn').addEventListener('click', () => {
         chrome.runtime.openOptionsPage();
@@ -10,16 +20,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const query = e.target.value.toLowerCase();
         filterList(query);
     });
-});
 
-let allData = {};
-
-// --- THEME HANDLING ---
-function loadTheme() {
-    chrome.storage.local.get(['theme'], (result) => {
-        applyTheme(result.theme === 'dark');
+    document.getElementById('theme-toggle').addEventListener('click', async () => {
+        const currentTheme = document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        await saveSetting('theme', newTheme);
+        applyTheme(newTheme === 'dark');
     });
-}
+});
 
 function applyTheme(isDark) {
     const themeToggleBtn = document.getElementById('theme-toggle');
@@ -32,51 +40,21 @@ function applyTheme(isDark) {
     }
 }
 
-document.getElementById('theme-toggle').addEventListener('click', () => {
-    const isDark = document.body.getAttribute('data-theme') !== 'dark';
-    chrome.storage.local.set({ theme: isDark ? 'dark' : 'light' }, () => {
-        applyTheme(isDark);
-    });
-});
-
-// Listen for theme changes from other windows
-chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'local' && changes.theme) {
+onStorageChange((changes) => {
+    if (changes.theme) {
         applyTheme(changes.theme.newValue === 'dark');
     }
+    if (changes.shortcuts) {
+        allData = changes.shortcuts.newValue || {};
+        renderList(allData);
+        renderTagCloud();
+    }
 });
-
-
-function migrateFormatIfNeeded(shortcuts, callback) {
-    let needsSave = false;
-    let newShortcuts = {};
-    for (let key in shortcuts) {
-        if (typeof shortcuts[key] === 'string') {
-            newShortcuts[key] = { text: shortcuts[key], tags: [] };
-            needsSave = true;
-        } else {
-            newShortcuts[key] = shortcuts[key];
-        }
-    }
-    if (needsSave) {
-        chrome.storage.local.set({ shortcuts: newShortcuts }, () => callback(newShortcuts));
-    } else {
-        callback(shortcuts);
-    }
-}
-
-function loadShortcuts() {
-    chrome.storage.local.get(['shortcuts'], (result) => {
-        migrateFormatIfNeeded(result.shortcuts || {}, (migratedData) => {
-            allData = migratedData;
-            renderList(allData);
-            if (typeof renderTagCloud === 'function') renderTagCloud();
-        });
-    });
-}
 
 function renderTagCloud() {
     const tagCloud = document.getElementById('tag-cloud');
+    if (!tagCloud) return;
+
     const tagsSet = new Set();
     for (const item of Object.values(allData)) {
         if (item.tags) item.tags.forEach(t => tagsSet.add(t));
@@ -102,12 +80,12 @@ function renderTagCloud() {
 function renderList(shortcutsObject) {
     const listElement = document.getElementById('list');
     const emptyState = document.getElementById('empty-state');
-    listElement.innerHTML = '';
-    
-    const keys = Object.keys(shortcutsObject);
-    emptyState.style.display = keys.length === 0 ? 'block' : 'none';
+    if (!listElement) return;
 
-    // Sort by usageCount descending, then by key
+    listElement.innerHTML = '';
+    const keys = Object.keys(shortcutsObject);
+    if (emptyState) emptyState.style.display = keys.length === 0 ? 'block' : 'none';
+
     keys.sort((a, b) => {
         const countA = shortcutsObject[a].usageCount || 0;
         const countB = shortcutsObject[b].usageCount || 0;
@@ -138,11 +116,11 @@ function renderList(shortcutsObject) {
         li.addEventListener('click', () => {
             const rawText = (typeof item === 'string' ? item : item.text);
             const textToCopy = rawText
-                .replace(/\{\{.*?\}\}/g, '') // Strip all {{variables}}
-                .replace(/\|/g, '')          // Strip the cursor marker
-                .replace(/[ \t]+/g, ' ')      // Collapse multiple spaces/tabs
-                .replace(/\n\s*\n/g, '\n')   // Remove empty lines
-                .trim();                     // Trim start/end
+                .replace(/\{\{.*?\}\}/g, '')
+                .replace(/\|/g, '')
+                .replace(/[ \t]+/g, ' ')
+                .replace(/\n\s*\n/g, '\n')
+                .trim();
 
             navigator.clipboard.writeText(textToCopy).then(() => {
                 const badge = li.querySelector('.copy-badge');
@@ -161,8 +139,8 @@ function filterList(query) {
     const filtered = {};
     for (const [key, item] of Object.entries(allData)) {
         const matchesKey = key.toLowerCase().includes(query);
-        const matchesText = item.text.toLowerCase().includes(query);
-        const matchesTag = item.tags.some(tag => tag.toLowerCase().includes(query.replace('#','')));
+        const matchesText = (item.text || "").toLowerCase().includes(query);
+        const matchesTag = (item.tags || []).some(tag => tag.toLowerCase().includes(query.replace('#','')));
         
         if (matchesKey || matchesText || matchesTag) {
             filtered[key] = item;
