@@ -379,8 +379,9 @@ window.addEventListener('input', (event) => {
         const start = target.selectionStart || 0;
         const textAfter = target.value.substring(start);
         
-        // Reliability: Only show if cursor is at the end of the text OR followed only by whitespace/newlines
-        if (/[^\s]/.test(textAfter)) {
+        // Reliability: Only show if cursor is at the end of the current line OR followed only by whitespace/newlines on this line
+        const currentLineAfter = textAfter.split('\n')[0];
+        if (/[^\s]/.test(currentLineAfter)) {
             ghost.hide();
             return;
         }
