@@ -4,7 +4,16 @@ import { STORAGE_KEYS, DEFAULT_SETTINGS } from './constants.js';
 export function getShortcuts() {
     return new Promise((resolve) => {
         chrome.storage.local.get([STORAGE_KEYS.SHORTCUTS], (result) => {
-            resolve(result.shortcuts || {});
+            const rawShortcuts = result.shortcuts || {};
+            const { shortcuts: migrated, migrated: needsSave } = migrateFormatIfNeeded(rawShortcuts);
+            
+            if (needsSave) {
+                chrome.storage.local.set({ [STORAGE_KEYS.SHORTCUTS]: migrated }, () => {
+                    resolve(migrated);
+                });
+            } else {
+                resolve(rawShortcuts);
+            }
         });
     });
 }

@@ -15,13 +15,6 @@ export async function resolveVariable(varName, showPrompt, showSelection) {
         // System Variables
         if (varName === 'date') return new Date().toISOString().split('T')[0];
         if (varName === 'time') return new Date().toTimeString().split(' ')[0].substring(0, 5);
-        if (varName === 'clipboard') {
-            try {
-                return await navigator.clipboard.readText();
-            } catch (e) {
-                return "";
-            }
-        }
 
         // Interactive Variables
         if (varName.startsWith('prompt:')) {
@@ -109,8 +102,8 @@ export async function replaceText(element, shortcut, replacement, shortcutKey, o
             const start = element.selectionStart;
             const sStart = Math.max(0, start - shortcut.length);
             
-            element.setSelectionRange(sStart, start);
-            document.execCommand('insertText', false, clean);
+            // Modern alternative to document.execCommand('insertText')
+            element.setRangeText(clean, sStart, start, 'end');
 
             if (parts.length > 1) {
                 const pos = sStart + [...head].length;
@@ -119,15 +112,41 @@ export async function replaceText(element, shortcut, replacement, shortcutKey, o
             element.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
         } 
         else if (element.isContentEditable) {
+            element.focus();
             const root = element.getRootNode();
             const sel = (root.getSelection ? root.getSelection() : null) || window.getSelection();
             if (!sel || !sel.rangeCount) return;
             
-            for (let i = 0; i < [...shortcut].length; i++) sel.modify('extend', 'backward', 'character');
-            document.execCommand('insertText', false, clean);
-            if (parts.length > 1) {
-                for (let i = 0; i < [...tail].length; i++) sel.modify('move', 'backward', 'character');
+            const range = sel.getRangeAt(0);
+            
+            // Move range start back by shortcut length to select the trigger
+            for (let i = 0; i < [...shortcut].length; i++) {
+                sel.modify('extend', 'backward', 'character');
             }
+            
+            const selectedRange = sel.getRangeAt(0);
+            selectedRange.deleteContents();
+            
+            // Create and insert the new text node
+            const textNode = document.createTextNode(clean);
+            selectedRange.insertNode(textNode);
+            
+            // Handle cursor position if | marker was used
+            if (parts.length > 1) {
+                const newRange = document.createRange();
+                newRange.setStart(textNode, [...head].length);
+                newRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+            } else {
+                // Move cursor to the end of inserted text
+                const newRange = document.createRange();
+                newRange.setStartAfter(textNode);
+                newRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+            }
+            
             element.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
         }
     } catch (err) {

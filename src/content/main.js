@@ -1,6 +1,6 @@
 // src/content/main.js
 import { MAX_LOOKBACK, STORAGE_KEYS } from '../shared/constants.js';
-import { getShortcuts, getSettings, onStorageChange } from '../shared/storage.js';
+import { getShortcuts, getSettings, onStorageChange, migrateFormatIfNeeded, saveShortcuts } from '../shared/storage.js';
 import { ShortcutEngine } from './trie.js';
 import { GhostTextManager } from './ghost-text.js';
 import { replaceText } from './expander.js';
@@ -111,12 +111,29 @@ async function showPrompt(label) {
         if (!activeEl) return resolve("");
         const rect = activeEl.getBoundingClientRect();
         const promptDiv = document.createElement('div');
+        
         chrome.storage.local.get(['theme'], (res) => {
             const isDark = res.theme === 'dark';
             promptDiv.style.cssText = `position: fixed; top: ${Math.max(10, rect.top - 100)}px; left: ${rect.left}px; background: ${isDark ? '#1e1e1e' : '#fff'}; color: ${isDark ? '#e0e0e0' : '#333'}; border: 2px solid #278efc; padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 2147483647; display: flex; flex-direction: column; gap: 10px; min-width: 240px; font-family: sans-serif;`;
-            promptDiv.innerHTML = `<div style="font-size: 11px; font-weight: bold; color: #278efc; text-transform: uppercase;">${label}</div><input type="text" id="sn-prompt-input" style="width: 100%; padding: 10px; border: 1px solid ${isDark ? '#444' : '#ccc'}; border-radius: 4px; outline: none; box-sizing: border-box; background: ${isDark ? '#2c2c2c' : '#fff'}; color: ${isDark ? '#fff' : '#000'};"><div style="font-size: 10px; color: ${isDark ? '#aaa' : '#999'};">Press Enter to insert, Esc to cancel</div>`;
+            
+            const labelEl = document.createElement('div');
+            labelEl.style.cssText = "font-size: 11px; font-weight: bold; color: #278efc; text-transform: uppercase;";
+            labelEl.textContent = label;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = 'sn-prompt-input';
+            input.style.cssText = `width: 100%; padding: 10px; border: 1px solid ${isDark ? '#444' : '#ccc'}; border-radius: 4px; outline: none; box-sizing: border-box; background: ${isDark ? '#2c2c2c' : '#fff'}; color: ${isDark ? '#fff' : '#000'};`;
+            
+            const hint = document.createElement('div');
+            hint.style.cssText = `font-size: 10px; color: ${isDark ? '#aaa' : '#999'};`;
+            hint.textContent = "Press Enter to insert, Esc to cancel";
+
+            promptDiv.appendChild(labelEl);
+            promptDiv.appendChild(input);
+            promptDiv.appendChild(hint);
             document.body.appendChild(promptDiv);
-            const input = promptDiv.querySelector('#sn-prompt-input');
+            
             input.focus();
             const cleanup = () => { promptDiv.remove(); activeEl.focus(); };
             input.onkeydown = (e) => { if (e.key === 'Enter') { const val = input.value; cleanup(); resolve(val); } else if (e.key === 'Escape') { cleanup(); resolve(""); } };
@@ -151,12 +168,23 @@ async function showSelection(options) {
             };
 
             const renderOptions = () => {
-                promptDiv.innerHTML = `<div style="font-size: 11px; font-weight: bold; color: #278efc; text-transform: uppercase; margin-bottom: 5px; padding: 0 5px;">Select Identity</div>`;
+                promptDiv.innerHTML = ""; // Clear
+                const title = document.createElement('div');
+                title.style.cssText = "font-size: 11px; font-weight: bold; color: #278efc; text-transform: uppercase; margin-bottom: 5px; padding: 0 5px;";
+                title.textContent = "Select Identity";
+                promptDiv.appendChild(title);
+
                 options.forEach((opt, idx) => {
                     const btn = document.createElement('div');
                     btn.className = 'sn-select-opt';
                     btn.style.cssText = `text-align: left; padding: 10px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-size: 13px; transition: 0.1s;`;
-                    btn.innerHTML = `<b style="color: ${isDark ? '#ffb74d' : '#e67e22'};">${opt.label}:</b> ${opt.value}`;
+                    
+                    const labelSpan = document.createElement('b');
+                    labelSpan.style.color = isDark ? '#ffb74d' : '#e67e22';
+                    labelSpan.textContent = opt.label + ": ";
+                    
+                    btn.appendChild(labelSpan);
+                    btn.appendChild(document.createTextNode(opt.value));
                     
                     btn.onmousedown = (e) => { 
                         e.preventDefault(); 
@@ -226,11 +254,21 @@ function showShortcutPopup(activeEl, trigger) {
     chrome.storage.local.get(['theme'], (res) => {
         const isDark = res.theme === 'dark';
         popup.style.cssText = `position: fixed; top: ${Math.max(10, rect.top + 25)}px; left: ${rect.left}px; width: 350px; background: ${isDark ? '#1e1e1e' : '#fff'}; color: ${isDark ? '#e0e0e0' : '#333'}; border: 2px solid #278efc; padding: 10px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 2147483647; font-family: sans-serif; display: flex; flex-direction: column; gap: 10px;`;
-        popup.innerHTML = `<input type="text" id="sn-popup-search" placeholder="Search templates..." style="width: 100%; padding: 8px; border: 1px solid ${isDark ? '#444' : '#ccc'}; border-radius: 4px; background: ${isDark ? '#2c2c2c' : '#fff'}; color: ${isDark ? '#fff' : '#000'}; outline: none; box-sizing: border-box;"><div id="sn-popup-list" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>`;
+        
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.id = 'sn-popup-search';
+        searchInput.placeholder = 'Search templates...';
+        searchInput.style.cssText = `width: 100%; padding: 8px; border: 1px solid ${isDark ? '#444' : '#ccc'}; border-radius: 4px; background: ${isDark ? '#2c2c2c' : '#fff'}; color: ${isDark ? '#fff' : '#000'}; outline: none; box-sizing: border-box;`;
+        
+        const listContainer = document.createElement('div');
+        listContainer.id = 'sn-popup-list';
+        listContainer.style.cssText = 'max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;';
+        
+        popup.appendChild(searchInput);
+        popup.appendChild(listContainer);
         document.body.appendChild(popup);
         
-        const searchInput = popup.querySelector('#sn-popup-search');
-        const listContainer = popup.querySelector('#sn-popup-list');
         searchInput.focus();
         
         let selectedIndex = 0;
@@ -263,7 +301,27 @@ function showShortcutPopup(activeEl, trigger) {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'sn-popup-item';
                 itemDiv.style.cssText = `padding: 8px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; display: flex; flex-direction: column; gap: 2px; transition: background 0.1s;`;
-                itemDiv.innerHTML = `<div style="display: flex; justify-content: space-between; align-items: center; pointer-events: none;"><b style="color: ${isDark ? '#ffb74d' : '#e67e22'}; font-size: 13px;">${key}</b><span style="font-size: 10px; color: ${isDark ? '#aaa' : '#999'};">Used: ${SHORTCUTS[key].usageCount || 0}</span></div><div style="font-size: 11px; color: ${isDark ? '#aaa' : '#666'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${(SHORTCUTS[key].text || "").substring(0, 60)}</div>`;
+                
+                const headerDiv = document.createElement('div');
+                headerDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; pointer-events: none;';
+                
+                const keyB = document.createElement('b');
+                keyB.style.cssText = `color: ${isDark ? '#ffb74d' : '#e67e22'}; font-size: 13px;`;
+                keyB.textContent = key;
+                
+                const usageSpan = document.createElement('span');
+                usageSpan.style.cssText = `font-size: 10px; color: ${isDark ? '#aaa' : '#999'};`;
+                usageSpan.textContent = `Used: ${SHORTCUTS[key].usageCount || 0}`;
+                
+                headerDiv.appendChild(keyB);
+                headerDiv.appendChild(usageSpan);
+                
+                const textDiv = document.createElement('div');
+                textDiv.style.cssText = `font-size: 11px; color: ${isDark ? '#aaa' : '#666'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;`;
+                textDiv.textContent = (SHORTCUTS[key].text || "").substring(0, 60);
+                
+                itemDiv.appendChild(headerDiv);
+                itemDiv.appendChild(textDiv);
                 
                 itemDiv.onmousedown = (e) => { 
                     e.preventDefault(); 
@@ -272,7 +330,6 @@ function showShortcutPopup(activeEl, trigger) {
                 };
 
                 itemDiv.onmousemove = (e) => {
-                    // Only update selection if mouse actually moved
                     if (e.clientX !== lastMouseX || e.clientY !== lastMouseY) {
                         lastMouseX = e.clientX;
                         lastMouseY = e.clientY;
@@ -296,7 +353,6 @@ function showShortcutPopup(activeEl, trigger) {
             popup.remove(); 
             activeEl.focus(); 
 
-            // If we closed without a selection, remove the trigger symbols
             if (!isSelection) {
                 if (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') {
                     const val = activeEl.value;
@@ -313,7 +369,8 @@ function showShortcutPopup(activeEl, trigger) {
                         for (let i = 0; i < trigger.length; i++) {
                             selection.modify('extend', 'backward', 'character');
                         }
-                        document.execCommand('delete');
+                        const range = selection.getRangeAt(0);
+                        range.deleteContents();
                     }
                 }
             }
@@ -436,7 +493,35 @@ function createStagedPreview(blob, context) {
     const wrapper = document.createElement('div');
     const url = URL.createObjectURL(blob);
     wrapper.style.cssText = "width: 250px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #ccc; padding: 10px; background: white; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);";
-    wrapper.innerHTML = `<div style="font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase;">Attach to: ${context.tableName}</div><img src="${url}" style="width: 100%; max-height: 180px; object-fit: contain; border: 1px solid #eee; background: #fafafa;"><div style="display: flex; gap: 10px;"><button id="up-btn" style="flex: 2; background: #278efc; color: white; border: none; padding: 8px; cursor: pointer; font-weight: bold; border-radius: 3px;">Upload (↵)</button><button id="del-btn" style="flex: 1; background: #f44336; color: white; border: none; padding: 8px; cursor: pointer; border-radius: 3px;">Discard (Esc)</button></div>`;
+    
+    const header = document.createElement('div');
+    header.style.cssText = "font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase;";
+    header.textContent = `Attach to: ${context.tableName}`;
+    
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = "width: 100%; max-height: 180px; object-fit: contain; border: 1px solid #eee; background: #fafafa;";
+    
+    const btnGroup = document.createElement('div');
+    btnGroup.style.cssText = "display: flex; gap: 10px;";
+    
+    const upBtn = document.createElement('button');
+    upBtn.id = "up-btn";
+    upBtn.style.cssText = "flex: 2; background: #278efc; color: white; border: none; padding: 8px; cursor: pointer; font-weight: bold; border-radius: 3px;";
+    upBtn.textContent = "Upload (↵)";
+    
+    const delBtn = document.createElement('button');
+    delBtn.id = "del-btn";
+    delBtn.style.cssText = "flex: 1; background: #f44336; color: white; border: none; padding: 8px; cursor: pointer; border-radius: 3px;";
+    delBtn.textContent = "Discard (Esc)";
+    
+    btnGroup.appendChild(upBtn);
+    btnGroup.appendChild(delBtn);
+    
+    wrapper.appendChild(header);
+    wrapper.appendChild(img);
+    wrapper.appendChild(btnGroup);
+
     const cleanup = () => { window.removeEventListener('keydown', handleKeys); URL.revokeObjectURL(url); wrapper.remove(); if (tray && !tray.children.length) tray.remove(); };
     const handleKeys = (e) => {
         if (e.key === 'Escape') { e.preventDefault(); cleanup(); }
@@ -446,15 +531,19 @@ function createStagedPreview(blob, context) {
         }
     };
     const uploadAction = async () => {
-        wrapper.querySelector('#up-btn').disabled = true;
-        wrapper.querySelector('#up-btn').innerText = "Uploading...";
+        upBtn.disabled = true;
+        upBtn.textContent = "Uploading...";
         if (await uploadImageDirectly(blob, context)) {
-            wrapper.innerHTML = `<b style="color: #4CAF50; text-align: center; display: block;">✅ Successfully Attached</b>`;
+            wrapper.innerHTML = "";
+            const successMsg = document.createElement('b');
+            successMsg.style.cssText = "color: #4CAF50; text-align: center; display: block;";
+            successMsg.textContent = "✅ Successfully Attached";
+            wrapper.appendChild(successMsg);
             setTimeout(cleanup, 2500);
         } else { alert("Upload failed."); cleanup(); }
     };
-    wrapper.querySelector('#up-btn').onclick = uploadAction;
-    wrapper.querySelector('#del-btn').onclick = cleanup;
+    upBtn.onclick = uploadAction;
+    delBtn.onclick = cleanup;
     window.addEventListener('keydown', handleKeys);
     tray.appendChild(wrapper);
 }

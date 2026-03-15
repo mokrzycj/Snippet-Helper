@@ -1,5 +1,5 @@
 // src/options/import-export.js
-import { getShortcuts, saveShortcuts } from '../shared/storage.js';
+import { getShortcuts, saveShortcuts, migrateFormatIfNeeded } from '../shared/storage.js';
 
 export async function exportToJSON() {
     const shortcuts = await getShortcuts();
@@ -25,8 +25,10 @@ export async function importFromJSON(file) {
                 
                 const existingShortcuts = await getShortcuts();
                 const mergedShortcuts = { ...existingShortcuts, ...importedShortcuts };
+                
                 await saveShortcuts(mergedShortcuts);
-                resolve(mergedShortcuts);
+                const finalized = await getShortcuts(); // This will trigger migration if any imported were old format
+                resolve(finalized);
             } catch (err) {
                 reject(err);
             }
