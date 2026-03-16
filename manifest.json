@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Snippet Helper: Text Expander and SN Toolkit",
-  "version": "2.2",
+  "version": "2.3",
   "description": "Professional Text Expander with ServiceNow productivity features: direct image attachments and URL linkifier.",
   "permissions": [
     "storage",
@@ -9,7 +9,6 @@
     "scripting"
   ],
   "host_permissions": [
-    "<all_urls>",
     "https://*.service-now.com/*"
   ],
   "action": {
