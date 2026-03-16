@@ -49,6 +49,9 @@ export function getSettings() {
 }
 
 export function saveSetting(key, value) {
+    if (key === STORAGE_KEYS.THEME) {
+        localStorage.setItem('theme', value);
+    }
     return new Promise((resolve) => {
         chrome.storage.local.set({ [key]: value }, resolve);
     });

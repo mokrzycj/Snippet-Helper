@@ -37,6 +37,12 @@ export async function removeShortcut(key) {
     await saveShortcuts(shortcuts);
 }
 
+export async function removeShortcutsBulk(keys) {
+    const shortcuts = await getShortcuts();
+    keys.forEach(key => delete shortcuts[key]);
+    await saveShortcuts(shortcuts);
+}
+
 export async function saveShortcut(key, item, editingOriginalKey) {
     const shortcuts = await getShortcuts();
     

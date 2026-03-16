@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Quick Search</title>
+  <script src="src/shared/theme-init.js"></script>
   <style>
     /* THEME VARIABLE DEFINITIONS */
     :root {
@@ -37,7 +38,9 @@
       --scrollbar-thumb: #555;
     }
 
-    body { width: 350px; margin: 0; padding: 15px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-main); transition: background-color 0.3s, color 0.3s; }
+    body { width: 350px; margin: 0; padding: 15px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-main); }
+    body.ready { transition: background-color 0.3s, color 0.3s; }
+    html { background-color: var(--bg-color); }
     
     .header { display: flex; gap: 10px; margin-bottom: 15px; }
     .search-box { flex: 1; padding: 12px; border: 2px solid var(--input-border); border-radius: 8px; font-size: 14px; box-sizing: border-box; outline: none; background: var(--input-bg); color: var(--text-main); }

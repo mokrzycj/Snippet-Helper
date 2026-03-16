@@ -21,5 +21,6 @@ export const STORAGE_KEYS = {
     ENABLE_SN_LINKS: 'enableSNLinks',
     PASTE_BEHAVIOR: 'pasteBehavior',
     THEME: 'theme',
-    STATS: 'stats'
+    STATS: 'stats',
+    HAS_SEEN_TUTORIAL: 'hasSeenTutorial'
 };

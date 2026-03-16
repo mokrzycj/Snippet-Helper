@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "ServiceNow Text Expander Pro",
+  "name": "Snippet Helper: Text Expander and SN Toolkit",
   "version": "2.2",
   "description": "Professional Text Expander with ServiceNow productivity features: direct image attachments and URL linkifier.",
   "permissions": [
@@ -14,7 +14,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "ServiceNow Expander",
+    "default_title": "Snippet Helper",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

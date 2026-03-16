@@ -64,7 +64,8 @@ export function renderGrid(dataToRender, selectedCards, options) {
     keys.sort().forEach(key => {
         const item = dataToRender[key];
         const card = document.createElement('div');
-        card.className = 'card';
+        const isSelected = selectedCards.has(key);
+        card.className = `card ${isSelected ? 'selected' : ''}`;
 
         let tagsHtml = '';
         if (item.tags && item.tags.length > 0) {
@@ -78,8 +79,8 @@ export function renderGrid(dataToRender, selectedCards, options) {
 
         card.innerHTML = `
             <div class="card-header">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <input type="checkbox" class="bulk-cb" style="cursor: pointer; width: 16px; height: 16px; margin: 0;" ${selectedCards.has(key) ? 'checked' : ''}>
+                <div style="display: flex; align-items: center; gap: 10px; pointer-events: none;">
+                    <input type="checkbox" class="bulk-cb" style="cursor: pointer; width: 16px; height: 16px; margin: 0; pointer-events: auto;" ${isSelected ? 'checked' : ''}>
                     <span class="card-key">${escapeHtml(key)}</span>
                 </div>
             </div>
@@ -91,9 +92,25 @@ export function renderGrid(dataToRender, selectedCards, options) {
             </div>
         `;
 
-        card.querySelector('.bulk-cb').addEventListener('change', (e) => onCheckboxToggle(key, e.target.checked));
-        card.querySelector('.edit').onclick = () => onEdit(key, item);
-        card.querySelector('.delete').onclick = () => onDelete(key);
+        const checkbox = card.querySelector('.bulk-cb');
+        const header = card.querySelector('.card-header');
+
+        const toggleSelection = (e) => {
+            const newState = !selectedCards.has(key);
+            onCheckboxToggle(key, newState);
+        };
+
+        header.onclick = (e) => {
+            if (e.target === checkbox) return; // Let checkbox handle its own change event
+            toggleSelection();
+        };
+
+        checkbox.onchange = (e) => {
+            onCheckboxToggle(key, e.target.checked);
+        };
+
+        card.querySelector('.edit').onclick = (e) => { e.stopPropagation(); onEdit(key, item); };
+        card.querySelector('.delete').onclick = (e) => { e.stopPropagation(); onDelete(key); };
 
         grid.appendChild(card);
     });

@@ -1,14 +1,16 @@
 // src/options/main.js
 import { getShortcuts, getSettings, saveSetting, onStorageChange } from '../shared/storage.js';
 import { renderStats, renderFilterTags, renderGrid, renderTagsInput } from './ui-render.js';
-import { extractAllTags, addBulkTag, removeShortcut, saveShortcut, findConflicts } from './shortcuts.js';
+import { extractAllTags, addBulkTag, removeShortcut, removeShortcutsBulk, saveShortcut, findConflicts } from './shortcuts.js';
 import { exportToJSON, importFromJSON } from './import-export.js';
+import { TutorialManager } from './tutorial.js';
 
 let allData = {};
 let currentTags = [];
 let editingOriginalKey = null;
 let selectedFilters = new Set();
 let selectedCards = new Set();
+let filteredKeys = [];
 
 const shortcutInput = document.getElementById('shortcut');
 const replacementInput = document.getElementById('replacement');
@@ -19,18 +21,25 @@ const saveBtn = document.getElementById('save-btn');
 const cancelBtn = document.getElementById('cancel-btn');
 const formTitle = document.getElementById('form-title');
 const searchInput = document.getElementById('search');
+const selectAllCb = document.getElementById('select-all-cb');
 
 document.addEventListener('DOMContentLoaded', async () => {
     const settings = await getSettings();
     applyTheme(settings.theme === 'dark');
+    setTimeout(() => document.body.classList.add('ready'), 10);
     loadSettingsUI(settings);
     
     allData = await getShortcuts();
     refreshUI();
+
+    const tutorial = new TutorialManager();
+    tutorial.init();
+
+    document.getElementById('show-guide-btn').onclick = () => tutorial.show();
     
     // Theme toggle
     document.getElementById('theme-toggle').addEventListener('click', async () => {
-        const isDark = document.body.getAttribute('data-theme') !== 'dark';
+        const isDark = document.documentElement.getAttribute('data-theme') !== 'dark';
         await saveSetting('theme', isDark ? 'dark' : 'light');
         applyTheme(isDark);
     });
@@ -48,11 +57,52 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
+    // Search Input
+    searchInput.addEventListener('input', applyFilters);
+
     // Form handling
     saveBtn.addEventListener('click', handleSave);
     cancelBtn.addEventListener('click', resetForm);
     tagInput.addEventListener('keydown', handleTagInput);
-    searchInput.addEventListener('input', applyFilters);
+
+    // Bulk Actions Setup
+    document.getElementById('bulk-add-btn').onclick = async () => {
+        const input = document.getElementById('bulk-tag-input');
+        const tag = input.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+        if (tag && selectedCards.size > 0) {
+            await addBulkTag(Array.from(selectedCards), tag);
+            input.value = '';
+            selectedCards.clear();
+            updateBulkUI();
+            refreshUI();
+        }
+    };
+
+    document.getElementById('bulk-delete-btn').onclick = async () => {
+        if (selectedCards.size > 0 && await showConfirm("Bulk Delete", `Are you sure you want to delete ${selectedCards.size} shortcuts?`)) {
+            await removeShortcutsBulk(Array.from(selectedCards));
+            selectedCards.clear();
+            updateBulkUI();
+            refreshUI();
+        }
+    };
+
+    document.getElementById('bulk-clear-btn').onclick = () => {
+        selectedCards.clear();
+        updateBulkUI();
+        applyFilters();
+    };
+
+    // Select All
+    selectAllCb.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            filteredKeys.forEach(key => selectedCards.add(key));
+        } else {
+            selectedCards.clear();
+        }
+        updateBulkUI();
+        applyFilters();
+    });
     
     // Import/Export
     document.getElementById('export-btn').addEventListener('click', exportToJSON);
@@ -66,13 +116,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
+async function showConfirm(title, body) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal');
+        const titleEl = document.getElementById('modal-title');
+        const bodyEl = document.getElementById('modal-body');
+        const confirmBtn = document.getElementById('modal-confirm');
+        const cancelBtn = document.getElementById('modal-cancel');
+
+        titleEl.textContent = title;
+        bodyEl.textContent = body;
+        modal.style.display = 'flex';
+
+        const cleanup = (val) => {
+            modal.style.display = 'none';
+            confirmBtn.onclick = null;
+            cancelBtn.onclick = null;
+            resolve(val);
+        };
+
+        confirmBtn.onclick = () => cleanup(true);
+        cancelBtn.onclick = () => cleanup(false);
+    });
+}
+
 function applyTheme(isDark) {
     const themeToggleBtn = document.getElementById('theme-toggle');
     if (isDark) {
-        document.body.setAttribute('data-theme', 'dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
         if (themeToggleBtn) themeToggleBtn.innerText = '☀️ Light theme';
     } else {
-        document.body.removeAttribute('data-theme');
+        document.documentElement.removeAttribute('data-theme');
         if (themeToggleBtn) themeToggleBtn.innerText = '🌙 Dark theme';
     }
 }
@@ -112,6 +186,7 @@ async function refreshUI() {
 function applyFilters() {
     const query = searchInput.value.toLowerCase();
     const filtered = {};
+    filteredKeys = [];
 
     for (const [key, item] of Object.entries(allData)) {
         const itemTags = item.tags || [];
@@ -127,7 +202,20 @@ function applyFilters() {
                             (item.text || "").toLowerCase().includes(query) || 
                             itemTags.some(t => t.toLowerCase().includes(query.replace('#', '')));
         }
-        if (matchesTags && matchesSearch) filtered[key] = item;
+        if (matchesTags && matchesSearch) {
+            filtered[key] = item;
+            filteredKeys.push(key);
+        }
+    }
+
+    // Update Select All checkbox state
+    if (filteredKeys.length > 0) {
+        const allSelected = filteredKeys.every(k => selectedCards.has(k));
+        selectAllCb.checked = allSelected;
+        selectAllCb.indeterminate = !allSelected && filteredKeys.some(k => selectedCards.has(k));
+    } else {
+        selectAllCb.checked = false;
+        selectAllCb.indeterminate = false;
     }
 
     renderGrid(filtered, selectedCards, {
@@ -143,7 +231,7 @@ function applyFilters() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         },
         onDelete: async (key) => {
-            if (confirm(`Delete shortcut "${key}"?`)) {
+            if (await showConfirm("Delete Shortcut", `Are you sure you want to delete "${key}"?`)) {
                 await removeShortcut(key);
                 selectedCards.delete(key);
                 refreshUI();
@@ -153,41 +241,16 @@ function applyFilters() {
             if (checked) selectedCards.add(key);
             else selectedCards.delete(key);
             updateBulkUI();
+            applyFilters(); // To update Select All checkbox state
         },
         escapeHtml
     });
 }
 
 function updateBulkUI() {
-    let bulkContainer = document.getElementById('bulk-container');
-    if (!bulkContainer && selectedCards.size > 0) {
-        bulkContainer = document.createElement('div');
-        bulkContainer.id = 'bulk-container';
-        bulkContainer.className = 'bulk-container';
-        bulkContainer.innerHTML = `<span class="bulk-label"><span id="bulk-count">0</span> selected</span><input type="text" id="bulk-tag-input" placeholder="Type new tag..."><button id="bulk-add-btn" class="btn btn-primary bulk-btn">Assign tag</button><button id="bulk-clear-btn" class="btn btn-secondary bulk-btn">Cancel</button>`;
-        const grid = document.getElementById('grid');
-        grid.parentNode.insertBefore(bulkContainer, grid);
-        
-        document.getElementById('bulk-add-btn').onclick = async () => {
-            const input = document.getElementById('bulk-tag-input');
-            const tag = input.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
-            if (tag) {
-                await addBulkTag(selectedCards, tag);
-                selectedCards.clear();
-                updateBulkUI();
-                refreshUI();
-            }
-        };
-        document.getElementById('bulk-clear-btn').onclick = () => { selectedCards.clear(); updateBulkUI(); applyFilters(); };
-    }
-    
+    const bulkContainer = document.getElementById('bulk-actions-inline');
     if (bulkContainer) {
-        if (selectedCards.size > 0) {
-            bulkContainer.style.display = 'flex';
-            document.getElementById('bulk-count').innerText = selectedCards.size;
-        } else {
-            bulkContainer.style.display = 'none';
-        }
+        bulkContainer.style.display = selectedCards.size > 0 ? 'flex' : 'none';
     }
 }
 
@@ -198,8 +261,8 @@ async function handleSave() {
 
     const conflicts = findConflicts(key, allData, editingOriginalKey);
     if (conflicts.length > 0) {
-        const msg = `Conflict detected:\n${conflicts.join('\n')}\n\nThis can cause issues with Ghost Text. Save anyway?`;
-        if (!confirm(msg)) return;
+        const body = `Conflict detected:\n${conflicts.join('\n')}\n\nThis can cause issues with Ghost Text. Save anyway?`;
+        if (!(await showConfirm("Conflict Detected", body))) return;
     }
 
     const item = { text, tags: [...currentTags], usageCount: editingOriginalKey ? (allData[editingOriginalKey]?.usageCount || 0) : 0 };

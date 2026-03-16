@@ -6,6 +6,7 @@ let allData = {};
 document.addEventListener('DOMContentLoaded', async () => {
     const settings = await getSettings();
     applyTheme(settings.theme === 'dark');
+    setTimeout(() => document.body.classList.add('ready'), 10);
     
     const shortcuts = await getShortcuts();
     allData = shortcuts;
@@ -22,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.getElementById('theme-toggle').addEventListener('click', async () => {
-        const currentTheme = document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        const currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         await saveSetting('theme', newTheme);
         applyTheme(newTheme === 'dark');
@@ -32,10 +33,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 function applyTheme(isDark) {
     const themeToggleBtn = document.getElementById('theme-toggle');
     if (isDark) {
-        document.body.setAttribute('data-theme', 'dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
         if(themeToggleBtn) themeToggleBtn.innerText = '☀️';
     } else {
-        document.body.removeAttribute('data-theme');
+        document.documentElement.removeAttribute('data-theme');
         if(themeToggleBtn) themeToggleBtn.innerText = '🌙';
     }
 }

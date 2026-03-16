@@ -67,7 +67,7 @@ export async function resolveVariable(varName, showPrompt, showSelection) {
         
         return fallbacks[varName] !== undefined ? fallbacks[varName] : `{{${varName}}}`;
     } catch (err) {
-        console.error(`ServiceNow Expander: Error resolving variable {{${varName}}}:`, err);
+        console.error(`Snippet Helper: Error resolving variable {{${varName}}}:`, err);
         return `{{${varName}}}`;
     }
 }
@@ -150,6 +150,6 @@ export async function replaceText(element, shortcut, replacement, shortcutKey, o
             element.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
         }
     } catch (err) {
-        console.error("ServiceNow Expander: Failed to replace text.", err);
+        console.error("Snippet Helper: Failed to replace text.", err);
     }
 }

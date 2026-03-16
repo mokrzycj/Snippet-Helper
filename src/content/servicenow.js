@@ -119,7 +119,7 @@ export async function uploadImageDirectly(blob, context) {
         });
         return res.ok;
     } catch (err) {
-        console.error("ServiceNow Expander: Auto-upload failed.", err);
+        console.error("Snippet Helper: Auto-upload failed.", err);
         return false;
     }
 }

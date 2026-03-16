@@ -403,13 +403,19 @@ function showShortcutPopup(activeEl, trigger) {
 
 // --- EVENT LISTENERS ---
 
-window.addEventListener('input', (event) => {
-    let target = event.target;
-    if (!target || target.shadowRoot) {
-        const deepTarget = getDeepActiveElement();
-        if (deepTarget) target = deepTarget;
+function handleGhostText(target) {
+    if (!settings.enableGhostText || !target) {
+        ghost.hide();
+        return;
     }
-    if (!target) return;
+
+    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+    const isEditable = target.isContentEditable;
+
+    if (!isInput && !isEditable) {
+        ghost.hide();
+        return;
+    }
 
     const text = getTextBeforeCursor(target, MAX_LOOKBACK);
     if (text.length === 0) { ghost.hide(); return; }
@@ -421,6 +427,46 @@ window.addEventListener('input', (event) => {
         return;
     }
 
+    // Try Standard Expansion (exact match only if it was an input event, but here we just check for ghost)
+    // Actually, exact matches are handled in the 'input' listener separately to avoid auto-expanding on click.
+    
+    // Check if cursor is followed by non-whitespace on the same line
+    let textAfter = "";
+    if (isInput) {
+        textAfter = target.value.substring(target.selectionStart || 0);
+    } else {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0).cloneRange();
+            range.setEndAfter(target);
+            textAfter = range.toString();
+        }
+    }
+
+    const currentLineAfter = textAfter.split('\n')[0];
+    if (/[^\s]/.test(currentLineAfter)) {
+        ghost.hide();
+        return;
+    }
+
+    const lastWord = text.split(/\s/).pop();
+    if (!lastWord) { ghost.hide(); return; }
+
+    const gMatch = engine.findTrieMatch(lastWord);
+    if (gMatch) ghost.show(target, gMatch, lastWord);
+    else ghost.hide();
+}
+
+window.addEventListener('input', (event) => {
+    let target = event.target;
+    if (!target || target.shadowRoot) {
+        const deepTarget = getDeepActiveElement();
+        if (deepTarget) target = deepTarget;
+    }
+    if (!target) return;
+
+    const text = getTextBeforeCursor(target, MAX_LOOKBACK);
+    
     // Try Standard Expansion
     const match = engine.findExactMatch(text);
     if (match) {
@@ -431,33 +477,43 @@ window.addEventListener('input', (event) => {
         return;
     }
 
-    // Try Ghost Text
-    if (settings.enableGhostText && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
-        const start = target.selectionStart || 0;
-        const textAfter = target.value.substring(start);
-        
-        // Reliability: Only show if cursor is at the end of the current line OR followed only by whitespace/newlines on this line
-        const currentLineAfter = textAfter.split('\n')[0];
-        if (/[^\s]/.test(currentLineAfter)) {
-            ghost.hide();
-            return;
-        }
+    handleGhostText(target);
+}, true);
 
-        const lastWord = text.split(/\s/).pop();
-        const gMatch = engine.findTrieMatch(lastWord);
-        if (gMatch) ghost.show(target, gMatch, lastWord);
-        else ghost.hide();
-    } else ghost.hide();
+window.addEventListener('keyup', (e) => {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        handleGhostText(e.target);
+    }
+}, true);
+
+window.addEventListener('mousedown', (e) => {
+    // Small delay to let the cursor position update
+    setTimeout(() => handleGhostText(e.target), 10);
 }, true);
 
 window.addEventListener('keydown', (e) => {
     if (settings.enableGhostText && e.key === 'Tab' && ghost.isActive() && ghost.targetElement) {
         const target = ghost.targetElement;
         const match = ghost.activeMatch;
-        const prefix = target.value.substring(0, target.selectionStart).split(/\s/).pop();
-        e.preventDefault(); e.stopImmediatePropagation();
+        const text = getTextBeforeCursor(target, MAX_LOOKBACK);
+        const prefix = text.split(/\s/).pop();
+        
+        e.preventDefault(); 
+        e.stopImmediatePropagation();
+        
         const suffix = match.shortcut.substring(prefix.length);
-        target.setRangeText(suffix, target.selectionStart, target.selectionEnd, 'end');
+        
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+            target.setRangeText(suffix, target.selectionStart, target.selectionEnd, 'end');
+        } else if (target.isContentEditable) {
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.insertNode(document.createTextNode(suffix));
+                range.collapse(false);
+            }
+        }
+        
         ghost.hide();
         replaceText(target, match.shortcut, match.text, match.shortcut, { showPrompt, showSelection, updateStats });
     } else if (e.key === 'Escape') ghost.hide();
