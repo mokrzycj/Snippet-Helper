@@ -5,8 +5,7 @@
   "description": "Professional Text Expander with ServiceNow productivity features: direct image attachments and URL linkifier.",
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting"
+    "activeTab"
   ],
   "host_permissions": [
     "https://*.service-now.com/*"
