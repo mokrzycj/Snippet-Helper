@@ -41,9 +41,9 @@ export async function resolveVariable(varName, showPrompt, showSelection) {
         // ServiceNow Variables
         if (table) {
             const callerCandidates = ['caller_id', 'u_caller', 'u_caller_id', 'opened_by'];
-            const reqForCandidates = ['requested_for', 'requested_for_label', 'u_requested_for', 'u_requested_for_label', 'requested_for_display'];
-            const openedByCandidates = ['opened_by', 'u_opened_by', 'opened_by_label'];
-            const assignedToCandidates = ['assigned_to', 'u_assigned_to', 'assigned_to_label'];
+            const reqForCandidates = ['requested_for', 'u_requested_for', 'requested_for_display'];
+            const openedByCandidates = ['opened_by', 'u_opened_by'];
+            const assignedToCandidates = ['assigned_to', 'u_assigned_to'];
 
             if (varName === 'identity_select') {
                 const options = [
