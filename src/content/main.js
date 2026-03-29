@@ -4,7 +4,7 @@ import { getShortcuts, getSettings, onStorageChange, migrateFormatIfNeeded, save
 import { ShortcutEngine } from './trie.js';
 import { GhostTextManager } from './ghost-text.js';
 import { replaceText } from './expander.js';
-import { linkifyStream, getRecordContext, isSafeRecordPage, uploadImageDirectly } from './servicenow.js';
+import { linkifyStream, getRecordContext, isSafeRecordPage, uploadImageDirectly, getListCollectorValues } from './servicenow.js';
 
 const engine = new ShortcutEngine();
 const ghost = new GhostTextManager();
@@ -24,14 +24,85 @@ async function init() {
     if (window.location.hostname.includes('service-now.com')) {
         const observer = new MutationObserver(() => {
             clearTimeout(window.snBoosterT);
-            window.snBoosterT = setTimeout(() => linkifyStream(settings.enableSNLinks), 500);
+            window.snBoosterT = setTimeout(() => {
+                linkifyStream(settings.enableSNLinks);
+                injectListCollectorButtons();
+            }, 500);
         });
         observer.observe(document.body, { childList: true, subtree: true });
-        setTimeout(() => linkifyStream(settings.enableSNLinks), 2000);
+        setTimeout(() => {
+            linkifyStream(settings.enableSNLinks);
+            injectListCollectorButtons();
+        }, 2000);
     }
 }
 
 init();
+
+function injectListCollectorButtons() {
+    if (!settings.enableSNListCopy) return;
+
+    // List collectors usually have a "select_1" element (the 'Selected' side)
+    const slushBuckets = document.querySelectorAll('select[id$="_select_1"]');
+    slushBuckets.forEach(selectEl => {
+        // Find a suitable container to attach the button to (usually the parent of the slush bucket)
+        const container = selectEl.closest('.slushbucket-container') || selectEl.parentElement;
+        if (!container || container.querySelector('.sn-list-copy-btn')) return;
+
+        const fieldId = selectEl.id.replace('_select_1', '');
+        // Clean ID for labels (e.g. IO:sys_id -> sys_id)
+        const cleanId = fieldId.includes(':') ? fieldId.split(':')[1] : fieldId;
+
+        const btn = document.createElement('button');
+        btn.className = 'sn-list-copy-btn';
+        btn.type = 'button';
+        btn.title = `Copy values from ${cleanId}`;
+        btn.innerHTML = '📋 Copy List';
+        
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || settings.theme === 'dark';
+
+        btn.style.cssText = `
+            margin: 5px 0;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid ${isDark ? '#444' : '#ccc'};
+            background: ${isDark ? '#2c2c2c' : '#f8f9fa'};
+            color: ${isDark ? '#e0e0e0' : '#333'};
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            z-index: 10;
+        `;
+
+        btn.onmouseover = () => { btn.style.background = isDark ? '#3d3d3d' : '#e9ecef'; };
+        btn.onmouseout = () => { btn.style.background = isDark ? '#2c2c2c' : '#f8f9fa'};
+
+        btn.onclick = (e) => {
+            e.preventDefault();
+            const values = getListCollectorValues(fieldId);
+            if (values) {
+                navigator.clipboard.writeText(values).then(() => {
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '✅ Copied!';
+                    btn.style.borderColor = '#28a745';
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.style.borderColor = isDark ? '#444' : '#ccc';
+                    }, 2000);
+                });
+            } else {
+                alert("No items selected in the list.");
+            }
+        };
+
+        // Inject at the top or bottom of the container
+        container.prepend(btn);
+    });
+}
 
 onStorageChange((changes) => {
     if (changes[STORAGE_KEYS.SHORTCUTS]) {
@@ -47,6 +118,9 @@ onStorageChange((changes) => {
     }
     if (changes[STORAGE_KEYS.ENABLE_SN_LINKS]) {
         settings.enableSNLinks = changes[STORAGE_KEYS.ENABLE_SN_LINKS].newValue;
+    }
+    if (changes[STORAGE_KEYS.ENABLE_SN_LIST_COPY]) {
+        settings.enableSNListCopy = changes[STORAGE_KEYS.ENABLE_SN_LIST_COPY].newValue;
     }
     if (changes[STORAGE_KEYS.ENABLE_SN_PASTE]) {
         settings.enableSNPaste = changes[STORAGE_KEYS.ENABLE_SN_PASTE].newValue;

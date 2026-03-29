@@ -155,6 +155,7 @@ function loadSettingsUI(settings) {
     document.getElementById('paste-behavior').value = settings.pasteBehavior;
     document.getElementById('enable-sn-paste').checked = settings.enableSNPaste;
     document.getElementById('enable-sn-links').checked = settings.enableSNLinks;
+    document.getElementById('enable-sn-list-copy').checked = settings.enableSNListCopy;
     document.getElementById('enable-ghost-text').checked = settings.enableGhostText;
     document.getElementById('trigger-symbol').value = settings.triggerSymbol;
 
@@ -162,6 +163,7 @@ function loadSettingsUI(settings) {
     document.getElementById('paste-behavior').onchange = (e) => saveSetting('pasteBehavior', e.target.value);
     document.getElementById('enable-sn-paste').onchange = (e) => saveSetting('enableSNPaste', e.target.checked);
     document.getElementById('enable-sn-links').onchange = (e) => saveSetting('enableSNLinks', e.target.checked);
+    document.getElementById('enable-sn-list-copy').onchange = (e) => saveSetting('enableSNListCopy', e.target.checked);
     document.getElementById('enable-ghost-text').onchange = (e) => saveSetting('enableGhostText', e.target.checked);
     document.getElementById('trigger-symbol').oninput = (e) => saveSetting('triggerSymbol', e.target.value);
 }

@@ -318,6 +318,7 @@
             <li><code>{{identity_select}}</code> - Prompt to choose from available SN names</li>
             <li><code>{{caller_name}}</code>, <code>{{requested_for}}</code>, <code>{{opened_by}}</code> - SN First Names</li>
             <li><code>{{ticket_number}}</code> - SN Field (number/id)</li>
+            <li><code>{{list:field_name}}</code> - SN List Collector (Selected Items)</li>
             <li><code>{{sn:field_name}}</code> - Custom ServiceNow Field</li>
           </ul>
         </div>
@@ -349,6 +350,13 @@
           <label for="enable-sn-links" class="switch-label">Enable SN Link Highlighter</label>
           <label class="switch">
             <input type="checkbox" id="enable-sn-links" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="switch-group">
+          <label for="enable-sn-list-copy" class="switch-label">Enable SN List Collector Copy</label>
+          <label class="switch">
+            <input type="checkbox" id="enable-sn-list-copy" checked>
             <span class="slider"></span>
           </label>
         </div>

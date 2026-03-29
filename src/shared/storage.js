@@ -30,6 +30,7 @@ export function getSettings() {
         STORAGE_KEYS.ENABLE_GHOST_TEXT,
         STORAGE_KEYS.ENABLE_SN_PASTE,
         STORAGE_KEYS.ENABLE_SN_LINKS,
+        STORAGE_KEYS.ENABLE_SN_LIST_COPY,
         STORAGE_KEYS.PASTE_BEHAVIOR,
         STORAGE_KEYS.THEME
     ];
@@ -41,6 +42,7 @@ export function getSettings() {
                 enableGhostText: result.enableGhostText ?? DEFAULT_SETTINGS.enableGhostText,
                 enableSNPaste: result.enableSNPaste ?? DEFAULT_SETTINGS.enableSNPaste,
                 enableSNLinks: result.enableSNLinks ?? DEFAULT_SETTINGS.enableSNLinks,
+                enableSNListCopy: result.enableSNListCopy ?? DEFAULT_SETTINGS.enableSNListCopy,
                 pasteBehavior: result.pasteBehavior ?? DEFAULT_SETTINGS.pasteBehavior,
                 theme: result.theme ?? DEFAULT_SETTINGS.theme
             });

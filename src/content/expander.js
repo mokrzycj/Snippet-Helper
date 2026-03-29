@@ -1,6 +1,6 @@
 // src/content/expander.js
 import { CURSOR_MARKER } from '../shared/constants.js';
-import { getRecordContext, findField } from './servicenow.js';
+import { getRecordContext, findField, getListCollectorValues } from './servicenow.js';
 
 export async function resolveVariable(varName, showPrompt, showSelection) {
     try {
@@ -20,6 +20,12 @@ export async function resolveVariable(varName, showPrompt, showSelection) {
         if (varName.startsWith('prompt:')) {
             const label = varName.split(':')[1] || "Input";
             return await showPrompt(label);
+        }
+
+        // List Collector Variables
+        if (varName.startsWith('list:')) {
+            const field = varName.split(':')[1];
+            return getListCollectorValues(field) || `[List:${field} Empty]`;
         }
 
         // ServiceNow Variables

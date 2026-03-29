@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS = {
     enableGhostText: true,
     enableSNPaste: true,
     enableSNLinks: true,
+    enableSNListCopy: true,
     pasteBehavior: 'smart', // 'smart', 'plain', 'html'
     theme: 'light'
 };
@@ -19,6 +20,7 @@ export const STORAGE_KEYS = {
     ENABLE_GHOST_TEXT: 'enableGhostText',
     ENABLE_SN_PASTE: 'enableSNPaste',
     ENABLE_SN_LINKS: 'enableSNLinks',
+    ENABLE_SN_LIST_COPY: 'enableSNListCopy',
     PASTE_BEHAVIOR: 'pasteBehavior',
     THEME: 'theme',
     STATS: 'stats',

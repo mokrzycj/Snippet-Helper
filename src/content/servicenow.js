@@ -49,6 +49,34 @@ export function findField(table, fieldNames, isDisplay = true) {
     return null;
 }
 
+export function getListCollectorValues(fieldName) {
+    const patterns = [
+        `${fieldName}_select_1`,
+        `IO:${fieldName}_select_1`,
+        `sys_display.${fieldName}_select_1`
+    ];
+
+    for (const id of patterns) {
+        const selectEl = document.getElementById(id);
+        if (selectEl && selectEl.options) {
+            return Array.from(selectEl.options)
+                .map(opt => opt.text || opt.innerText)
+                .join(', ');
+        }
+    }
+    
+    // Fallback: try finding by suffix (e.g. catalog variables)
+    const suffix = `${fieldName}_select_1`;
+    const elSuffix = document.querySelector(`select[id$="${suffix}"]`);
+    if (elSuffix && elSuffix.options) {
+        return Array.from(elSuffix.options)
+            .map(opt => opt.text || opt.innerText)
+            .join(', ');
+    }
+
+    return "";
+}
+
 export function linkifyStream(enableSNLinks) {
     if (!enableSNLinks) return;
 
