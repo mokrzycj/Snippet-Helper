@@ -50,6 +50,7 @@ export function findField(table, fieldNames, isDisplay = true) {
 }
 
 export function getListCollectorValues(fieldName) {
+    console.log("Snippet Helper: Debugging List Collector", fieldName);
     const patterns = [
         `${fieldName}_select_1`,
         `IO:${fieldName}_select_1`,
@@ -58,14 +59,16 @@ export function getListCollectorValues(fieldName) {
 
     for (const id of patterns) {
         const selectEl = document.getElementById(id);
+        console.log(`Snippet Helper: Checking ID ${id}`, selectEl ? "Found" : "Not Found");
         if (selectEl && selectEl.options) {
-            return Array.from(selectEl.options)
+            const values = Array.from(selectEl.options)
                 .map(opt => opt.text || opt.innerText)
                 .join(', ');
+            console.log("Snippet Helper: Found values", values);
+            return values;
         }
     }
     
-    // Fallback: try finding by suffix (e.g. catalog variables)
     const suffix = `${fieldName}_select_1`;
     const elSuffix = document.querySelector(`select[id$="${suffix}"]`);
     if (elSuffix && elSuffix.options) {
@@ -74,6 +77,89 @@ export function getListCollectorValues(fieldName) {
             .join(', ');
     }
 
+    return "";
+}
+
+export function getGlideListValues(fieldName) {
+    console.log("Snippet Helper: Debugging Glide List (Watch List)", fieldName);
+    
+    // 1. Try the "unlocked" select box (select_0 prefix)
+    const select0Id = `select_0${fieldName}`;
+    const select0 = document.getElementById(select0Id) || document.querySelector(`select[id$="${fieldName}"][id^="select_0"]`);
+    if (select0 && select0.options) {
+        console.log("Snippet Helper: Found unlocked select_0 box");
+        const values = Array.from(select0.options)
+            .map(opt => opt.text || opt.innerText)
+            .join(', ');
+        if (values) return values;
+    }
+
+    // 2. Try the "locked" or "non-edit" container
+    const selectors = [
+        `#${fieldName}_list`,
+        `#sys_display.${fieldName}_list`,
+        `#${fieldName}_container`,
+        `[id*="${fieldName}"][id$="_list"]`,
+        `.glide-list-container`
+    ];
+    
+    for (const selector of selectors) {
+        const container = document.querySelector(selector);
+        console.log(`Snippet Helper: Checking selector ${selector}`, container ? "Found" : "Not Found");
+        if (container) {
+            const pills = container.querySelectorAll('.vst-pill, .list_item, [data-value], .sn-pill, .glide-list-pill');
+            console.log(`Snippet Helper: Found ${pills.length} pills in container`);
+            if (pills.length > 0) {
+                const values = Array.from(pills)
+                    .map(p => {
+                        let text = p.textContent.trim();
+                        return text.replace(/×$/, '').replace(/\s*x\s*$/i, '').trim();
+                    })
+                    .filter(t => t.length > 0)
+                    .join(', ');
+                console.log("Snippet Helper: Found values", values);
+                return values;
+            }
+        }
+    }
+
+    // Next Exp Check
+    const nextExpPills = document.querySelectorAll(`[id*="${fieldName}"] .sn-pill-label, [id*="${fieldName}"] .pill-text`);
+    if (nextExpPills.length > 0) {
+        return Array.from(nextExpPills).map(p => p.textContent.trim()).join(', ');
+    }
+
+    return "";
+}
+
+export function getRelatedListValues(tableOrTitle) {
+    console.log("Snippet Helper: Debugging Related List", tableOrTitle);
+    const tables = document.querySelectorAll('table.list_table');
+    console.log(`Snippet Helper: Found ${tables.length} list tables on page`);
+
+    for (const table of tables) {
+        const wrapper = table.closest('.related-list-container, [id*="_wrapper"]');
+        const title = wrapper ? wrapper.innerText.toLowerCase() : "";
+        const id = table.id.toLowerCase();
+        
+        console.log(`Snippet Helper: Checking Table ID: ${id}, Title: ${title}`);
+
+        if (id.includes(tableOrTitle.toLowerCase()) || title.includes(tableOrTitle.toLowerCase())) {
+            const rows = table.querySelectorAll('tr.list_row, tr.list_odd, tr.list_even');
+            const values = [];
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                for (let i = 2; i < Math.min(cells.length, 6); i++) {
+                    const text = cells[i].innerText.trim();
+                    if (text && text.length > 1) {
+                        values.push(text);
+                        break;
+                    }
+                }
+            });
+            return values.join(', ');
+        }
+    }
     return "";
 }
 

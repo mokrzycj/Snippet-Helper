@@ -4,7 +4,7 @@ import { getShortcuts, getSettings, onStorageChange, migrateFormatIfNeeded, save
 import { ShortcutEngine } from './trie.js';
 import { GhostTextManager } from './ghost-text.js';
 import { replaceText } from './expander.js';
-import { linkifyStream, getRecordContext, isSafeRecordPage, uploadImageDirectly, getListCollectorValues } from './servicenow.js';
+import { linkifyStream, getRecordContext, isSafeRecordPage, uploadImageDirectly, getListCollectorValues, getGlideListValues, getRelatedListValues } from './servicenow.js';
 
 const engine = new ShortcutEngine();
 const ghost = new GhostTextManager();
@@ -42,66 +42,170 @@ init();
 function injectListCollectorButtons() {
     if (!settings.enableSNListCopy) return;
 
-    // List collectors usually have a "select_1" element (the 'Selected' side)
+    // 1. Slushbuckets (List Collectors)
     const slushBuckets = document.querySelectorAll('select[id$="_select_1"]');
     slushBuckets.forEach(selectEl => {
-        // Find a suitable container to attach the button to (usually the parent of the slush bucket)
         const container = selectEl.closest('.slushbucket-container') || selectEl.parentElement;
         if (!container || container.querySelector('.sn-list-copy-btn')) return;
 
         const fieldId = selectEl.id.replace('_select_1', '');
-        // Clean ID for labels (e.g. IO:sys_id -> sys_id)
-        const cleanId = fieldId.includes(':') ? fieldId.split(':')[1] : fieldId;
-
-        const btn = document.createElement('button');
-        btn.className = 'sn-list-copy-btn';
-        btn.type = 'button';
-        btn.title = `Copy values from ${cleanId}`;
-        btn.innerHTML = '📋 Copy List';
-        
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || settings.theme === 'dark';
-
-        btn.style.cssText = `
-            margin: 5px 0;
-            padding: 4px 8px;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 4px;
-            border: 1px solid ${isDark ? '#444' : '#ccc'};
-            background: ${isDark ? '#2c2c2c' : '#f8f9fa'};
-            color: ${isDark ? '#e0e0e0' : '#333'};
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            z-index: 10;
-        `;
-
-        btn.onmouseover = () => { btn.style.background = isDark ? '#3d3d3d' : '#e9ecef'; };
-        btn.onmouseout = () => { btn.style.background = isDark ? '#2c2c2c' : '#f8f9fa'};
-
-        btn.onclick = (e) => {
-            e.preventDefault();
-            const values = getListCollectorValues(fieldId);
-            if (values) {
-                navigator.clipboard.writeText(values).then(() => {
-                    const originalText = btn.innerHTML;
-                    btn.innerHTML = '✅ Copied!';
-                    btn.style.borderColor = '#28a745';
-                    setTimeout(() => {
-                        btn.innerHTML = originalText;
-                        btn.style.borderColor = isDark ? '#444' : '#ccc';
-                    }, 2000);
-                });
-            } else {
-                alert("No items selected in the list.");
-            }
-        };
-
-        // Inject at the top or bottom of the container
-        container.prepend(btn);
+        appendCopyBtn(container, fieldId, 'list');
     });
+
+    // 2. Glide Lists (Watch Lists)
+    const glideLists = document.querySelectorAll('.glide-list-container, [id$="_unlock"], [id$="_lock"]');
+    glideLists.forEach(el => {
+        const container = el.closest('.form-group, .vst-container, .sn-glide-list') || el.parentElement;
+        if (!container || container.querySelector('.sn-list-copy-btn')) return;
+        
+        let fieldId = el.id.replace('_unlock', '').replace('_lock', '');
+        if (!fieldId && el.classList.contains('glide-list-container')) {
+            const inner = el.querySelector('[id$="_list"]');
+            if (inner) fieldId = inner.id.replace('_list', '');
+        }
+
+        if (fieldId) appendCopyBtn(container, fieldId, 'glide');
+    });
+
+    // 3. Related Lists (Tables)
+    const relatedListHeaders = document.querySelectorAll('.list_nav_spacer, .tabs_list_container');
+    relatedListHeaders.forEach(header => {
+        if (header.querySelector('.sn-list-copy-btn')) return;
+        
+        const wrapper = header.closest('.related-list-container, [id*="_wrapper"]');
+        if (wrapper) {
+            const table = wrapper.querySelector('table.list_table');
+            if (table && table.id) {
+                appendCopyBtn(header, table.id, 'related');
+            }
+        }
+    });
+}
+
+function appendCopyBtn(container, fieldId, type) {
+    const btn = document.createElement('button');
+    btn.className = 'sn-list-copy-btn';
+    btn.type = 'button';
+    
+    // Sleek Icon UI - White for high contrast
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>`;
+    
+    // Ensure the container is a positioning anchor
+    if (window.getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+    }
+
+    // Universal Styles - High contrast ServiceNow Blue theme
+    btn.style.cssText = `
+        position: absolute;
+        top: 2px;
+        right: ${type === 'related' ? '10px' : '30px'};
+        padding: 4px;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        border-radius: 6px;
+        border: none;
+        background: #278efc;
+        color: white;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 9999;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    `;
+
+    // Container Hover Listeners - Show/Hide the button
+    container.addEventListener('mouseenter', () => {
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+    });
+    
+    container.addEventListener('mouseleave', () => {
+        btn.style.opacity = '0';
+        btn.style.pointerEvents = 'none';
+    });
+
+    // Tooltip logic
+    const updateTooltip = () => {
+        let values = "";
+        try {
+            if (type === 'list') values = getListCollectorValues(fieldId);
+            else if (type === 'glide') values = getGlideListValues(fieldId);
+            else if (type === 'related') values = getRelatedListValues(fieldId);
+        } catch(e){}
+        const count = values ? values.split(',').length : 0;
+        btn.title = count > 0 ? `Copy ${count} item(s) from ${type}` : `List is empty`;
+    };
+
+    btn.onmouseover = () => { 
+        updateTooltip();
+        btn.style.background = '#1a73e8'; // Darker blue on hover
+        btn.style.transform = 'scale(1.1)';
+    };
+    btn.onmouseout = () => { 
+        btn.style.background = '#278efc';
+        btn.style.transform = 'scale(1)';
+    };
+
+    btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        let values = "";
+        try {
+            if (type === 'list') values = getListCollectorValues(fieldId);
+            else if (type === 'glide') values = getGlideListValues(fieldId);
+            else if (type === 'related') values = getRelatedListValues(fieldId);
+        } catch (err) {
+            console.error("Snippet Helper: Error gathering list values", err);
+        }
+
+        if (values) {
+            const copyToClipboard = (text) => {
+                if (navigator.clipboard && window.isSecureContext) {
+                    return navigator.clipboard.writeText(text);
+                } else {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = text;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    return new Promise((res, rej) => {
+                        document.execCommand('copy') ? res() : rej();
+                        textArea.remove();
+                    });
+                }
+            };
+
+            copyToClipboard(values).then(() => {
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                btn.style.background = '#28a745'; // Green on success
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.style.background = '#278efc';
+                }, 2000);
+            }).catch(err => {
+                console.error("Snippet Helper: Clipboard copy failed", err);
+            });
+        } else {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+            btn.style.background = '#e67e22'; // Orange on empty
+            setTimeout(() => { 
+                btn.innerHTML = originalHTML; 
+                btn.style.background = '#278efc';
+            }, 2000);
+        }
+    };
+
+    container.appendChild(btn); 
 }
 
 onStorageChange((changes) => {

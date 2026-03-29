@@ -1,6 +1,6 @@
 // src/content/expander.js
 import { CURSOR_MARKER } from '../shared/constants.js';
-import { getRecordContext, findField, getListCollectorValues } from './servicenow.js';
+import { getRecordContext, findField, getListCollectorValues, getGlideListValues, getRelatedListValues } from './servicenow.js';
 
 export async function resolveVariable(varName, showPrompt, showSelection) {
     try {
@@ -26,6 +26,16 @@ export async function resolveVariable(varName, showPrompt, showSelection) {
         if (varName.startsWith('list:')) {
             const field = varName.split(':')[1];
             return getListCollectorValues(field) || `[List:${field} Empty]`;
+        }
+
+        if (varName.startsWith('glide_list:')) {
+            const field = varName.split(':')[1];
+            return getGlideListValues(field) || `[GlideList:${field} Empty]`;
+        }
+
+        if (varName.startsWith('related_list:')) {
+            const target = varName.split(':')[1];
+            return getRelatedListValues(target) || `[RelatedList:${target} Empty]`;
         }
 
         // ServiceNow Variables
