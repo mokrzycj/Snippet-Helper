@@ -49,32 +49,59 @@ export function findField(table, fieldNames, isDisplay = true) {
     return null;
 }
 
-export function getListCollectorValues(fieldName) {
-    console.log("Snippet Helper: Debugging List Collector", fieldName);
+export function getSlushbucketValues(fieldName, side = 'right') {
+    const suffix = side === 'right' ? '_select_1' : '_select_0';
     const patterns = [
-        `${fieldName}_select_1`,
-        `IO:${fieldName}_select_1`,
-        `sys_display.${fieldName}_select_1`
+        fieldName + suffix,
+        `IO:${fieldName}${suffix}`,
+        `sys_display.${fieldName}${suffix}`
     ];
 
     for (const id of patterns) {
         const selectEl = document.getElementById(id);
-        console.log(`Snippet Helper: Checking ID ${id}`, selectEl ? "Found" : "Not Found");
         if (selectEl && selectEl.options) {
-            const values = Array.from(selectEl.options)
+            return Array.from(selectEl.options)
                 .map(opt => opt.text || opt.innerText)
+                .filter(val => val && val.trim().length > 0)
                 .join(', ');
-            console.log("Snippet Helper: Found values", values);
-            return values;
         }
     }
+    return "";
+}
+
+export function getListCollectorValues(fieldName) {
+    // Default to selected (right) values
+    const rightValues = getSlushbucketValues(fieldName, 'right');
+    if (rightValues) return rightValues;
     
-    const suffix = `${fieldName}_select_1`;
-    const elSuffix = document.querySelector(`select[id$="${suffix}"]`);
-    if (elSuffix && elSuffix.options) {
-        return Array.from(elSuffix.options)
-            .map(opt => opt.text || opt.innerText)
-            .join(', ');
+    // Fallback to generic pill lookup
+    const containerSelectors = [
+        `[id*="${fieldName}"][class*="container"]`,
+        `[id*="${fieldName}"][class*="list"]`,
+        `.slushbucket-container`
+    ];
+
+
+    for (const selector of containerSelectors) {
+        try {
+            const containers = document.querySelectorAll(selector);
+            for (const container of containers) {
+                const pills = container.querySelectorAll('.sn-pill, .vst-pill, .select2-selection__choice, .pill, .list_item');
+                if (pills.length > 0) {
+                    const values = Array.from(pills)
+                        .map(p => {
+                            // Clone to remove the 'x' button text if it exists
+                            const clone = p.cloneNode(true);
+                            const removes = clone.querySelectorAll('.sn-pill-remove, .vst-pill-remove, .select2-selection__choice__remove, .remove, .delete');
+                            removes.forEach(r => r.remove());
+                            return clone.textContent.trim().replace(/×$/, '').trim();
+                        })
+                        .filter(v => v.length > 0)
+                        .join(', ');
+                    if (values) return values;
+                }
+            }
+        } catch(e) {}
     }
 
     return "";
@@ -84,49 +111,61 @@ export function getGlideListValues(fieldName) {
     console.log("Snippet Helper: Debugging Glide List (Watch List)", fieldName);
     
     // 1. Try the "unlocked" select box (select_0 prefix)
-    const select0Id = `select_0${fieldName}`;
-    const select0 = document.getElementById(select0Id) || document.querySelector(`select[id$="${fieldName}"][id^="select_0"]`);
-    if (select0 && select0.options) {
-        console.log("Snippet Helper: Found unlocked select_0 box");
-        const values = Array.from(select0.options)
-            .map(opt => opt.text || opt.innerText)
-            .join(', ');
-        if (values) return values;
-    }
-
-    // 2. Try the "locked" or "non-edit" container
-    const selectors = [
-        `#${fieldName}_list`,
-        `#sys_display.${fieldName}_list`,
-        `#${fieldName}_container`,
-        `[id*="${fieldName}"][id$="_list"]`,
-        `.glide-list-container`
+    const select0Ids = [
+        `select_0${fieldName}`,
+        `select_0${fieldName.split('.').pop()}`,
+        `vars_select_0${fieldName}`
     ];
     
-    for (const selector of selectors) {
-        const container = document.querySelector(selector);
-        console.log(`Snippet Helper: Checking selector ${selector}`, container ? "Found" : "Not Found");
+    for (const id of select0Ids) {
+        const select0 = document.getElementById(id);
+        if (select0 && select0.options && select0.offsetParent !== null) { // Ensure it's visible/active
+            const values = Array.from(select0.options)
+                .map(opt => opt.text || opt.innerText)
+                .filter(v => v && v.trim().length > 0)
+                .join(', ');
+            if (values) return values;
+        }
+    }
+
+    // 2. Try the "locked" / "non-edit" hidden values (often for screen readers but reliable)
+    const nonEditId = fieldName + "_nonedit_sr";
+    const nonEditEl = document.getElementById(nonEditId);
+    if (nonEditEl) {
+        const val = nonEditEl.textContent.trim();
+        if (val) {
+            console.log("Snippet Helper: Found non-edit values", val);
+            return val;
+        }
+    }
+
+    // 3. Try various container IDs
+    const containerIds = [
+        `${fieldName}_list`,
+        `sys_display.${fieldName}_list`,
+        `${fieldName}_container`,
+        `sys_display.${fieldName}`,
+        fieldName
+    ];
+    
+    for (const id of containerIds) {
+        const container = document.getElementById(id);
         if (container) {
-            const pills = container.querySelectorAll('.vst-pill, .list_item, [data-value], .sn-pill, .glide-list-pill');
-            console.log(`Snippet Helper: Found ${pills.length} pills in container`);
+            const pills = container.querySelectorAll('.vst-pill, .list_item, [data-value], .sn-pill, .glide-list-pill, .select2-selection__choice');
             if (pills.length > 0) {
                 const values = Array.from(pills)
                     .map(p => {
-                        let text = p.textContent.trim();
+                        const clone = p.cloneNode(true);
+                        const removes = clone.querySelectorAll('[class*="remove"], [class*="delete"], .delete-icon');
+                        removes.forEach(r => r.remove());
+                        let text = clone.textContent.trim();
                         return text.replace(/×$/, '').replace(/\s*x\s*$/i, '').trim();
                     })
                     .filter(t => t.length > 0)
                     .join(', ');
-                console.log("Snippet Helper: Found values", values);
-                return values;
+                if (values) return values;
             }
         }
-    }
-
-    // Next Exp Check
-    const nextExpPills = document.querySelectorAll(`[id*="${fieldName}"] .sn-pill-label, [id*="${fieldName}"] .pill-text`);
-    if (nextExpPills.length > 0) {
-        return Array.from(nextExpPills).map(p => p.textContent.trim()).join(', ');
     }
 
     return "";
@@ -135,22 +174,24 @@ export function getGlideListValues(fieldName) {
 export function getRelatedListValues(tableOrTitle) {
     console.log("Snippet Helper: Debugging Related List", tableOrTitle);
     const tables = document.querySelectorAll('table.list_table');
-    console.log(`Snippet Helper: Found ${tables.length} list tables on page`);
-
+    
     for (const table of tables) {
-        const wrapper = table.closest('.related-list-container, [id*="_wrapper"]');
+        const wrapper = table.closest('.related-list-container, [id*="_wrapper"], .tabs_list_container');
         const title = wrapper ? wrapper.innerText.toLowerCase() : "";
         const id = table.id.toLowerCase();
         
-        console.log(`Snippet Helper: Checking Table ID: ${id}, Title: ${title}`);
-
         if (id.includes(tableOrTitle.toLowerCase()) || title.includes(tableOrTitle.toLowerCase())) {
             const rows = table.querySelectorAll('tr.list_row, tr.list_odd, tr.list_even');
             const values = [];
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
-                for (let i = 2; i < Math.min(cells.length, 6); i++) {
-                    const text = cells[i].innerText.trim();
+                // Skip checkbox and icon columns
+                for (let i = 0; i < cells.length; i++) {
+                    const cell = cells[i];
+                    if (cell.classList.contains('list_checkbox') || cell.querySelector('input[type="checkbox"]')) continue;
+                    if (cell.querySelector('a.list_popup')) continue;
+                    
+                    const text = cell.innerText.trim();
                     if (text && text.length > 1) {
                         values.push(text);
                         break;

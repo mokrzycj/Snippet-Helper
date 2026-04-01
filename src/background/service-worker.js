@@ -30,3 +30,5 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         chrome.runtime.openOptionsPage();
     }
 });
+
+
